@@ -18,11 +18,17 @@ export default function Home() {
       <main className="bg-background-deep min-h-screen selection:bg-indigo-500/30 selection:text-indigo-200">
         <Navbar />
         <Hero />
-        <ProblemSolution />
-        <Features />
-        <HowItWorks />
+        <div id="features">
+          <ProblemSolution />
+          <Features />
+        </div>
+        <div id="demo">
+          <HowItWorks />
+        </div>
         <Testimonials />
-        <Pricing />
+        <div id="pricing">
+          <Pricing />
+        </div>
         <FAQ />
         <CTA />
         <Footer />

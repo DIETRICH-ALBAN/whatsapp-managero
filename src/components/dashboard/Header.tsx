@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Bell, Search, User } from 'lucide-react'
+import { Bell, Search, User, CreditCard, Settings, LogOut } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import {
     DropdownMenu,
@@ -61,15 +61,30 @@ export function Header({ user }: { user: any }) {
                             </div>
                         </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 mt-2">
-                        <DropdownMenuLabel>Mon Compte</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem>Profil</DropdownMenuItem>
-                        <DropdownMenuItem>Facturation</DropdownMenuItem>
-                        <DropdownMenuItem>Paramètres</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-500 focus:text-red-500" onClick={handleLogout}>
-                            Se déconnecter
+                    <DropdownMenuContent align="end" className="w-64 mt-2 p-2 bg-white/80 dark:bg-[#0B0B0F]/90 backdrop-blur-xl border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl">
+                        <DropdownMenuLabel className="font-normal p-3">
+                            <div className="flex flex-col space-y-1">
+                                <p className="text-sm font-medium leading-none text-slate-900 dark:text-white">Mon Compte</p>
+                                <p className="text-xs leading-none text-slate-500 dark:text-slate-400">{user?.email}</p>
+                            </div>
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator className="bg-slate-200 dark:bg-white/5" />
+                        <DropdownMenuItem className="cursor-pointer rounded-xl focus:bg-indigo-50 dark:focus:bg-white/5 p-3">
+                            <User className="mr-2 h-4 w-4 text-indigo-500" />
+                            <span>Profil</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="cursor-pointer rounded-xl focus:bg-indigo-50 dark:focus:bg-white/5 p-3">
+                            <CreditCard className="mr-2 h-4 w-4 text-purple-500" />
+                            <span>Facturation</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="cursor-pointer rounded-xl focus:bg-indigo-50 dark:focus:bg-white/5 p-3">
+                            <Settings className="mr-2 h-4 w-4 text-blue-500" />
+                            <span>Paramètres</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="bg-slate-200 dark:bg-white/5" />
+                        <DropdownMenuItem className="cursor-pointer rounded-xl focus:bg-red-50 dark:focus:bg-red-500/10 text-red-500 focus:text-red-500 p-3" onClick={handleLogout}>
+                            <LogOut className="mr-2 h-4 w-4" />
+                            <span>Se déconnecter</span>
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>

@@ -2,7 +2,6 @@
 
 import { motion } from 'framer-motion'
 import { Card, CardContent } from '@/components/ui/card'
-import { HoverCard } from '@/components/ui/hover-card' // Placeholder if needed
 import { BrainCircuit, MessageSquareText, ShoppingBag, BarChart3, Clock, Lock } from 'lucide-react'
 
 const features = [

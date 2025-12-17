@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+html {
+  scroll-behavior: smooth;
+}
+
 /* ========================================
    THEME DEEP VIOLET & NEON (Business Night)
    ======================================== */

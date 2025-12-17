@@ -1,7 +1,16 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-// WARNING: This key has full admin privileges. Only use on server-side.
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+if (!supabaseUrl || !supabaseServiceRoleKey) {
+    console.warn('Missing env variables for Supabase Admin client')
+}
+
+// Client avec droits "Admin" pour contourner les RLS dans les Webhooks API
+export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+        autoRefreshToken: false,
+        persistSession: false
+    }
+})

@@ -1,11 +1,29 @@
 'use client'
 
+import React from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/ui/logo'
 
 export function Navbar() {
+    const handleScroll = (e: React.MouseEvent<HTMLAnchorElement, MouseEvent>, id: string) => {
+        e.preventDefault()
+        const element = document.getElementById(id)
+        if (element) {
+            const offset = 80 // Navbar height + padding
+            const bodyRect = document.body.getBoundingClientRect().top
+            const elementRect = element.getBoundingClientRect().top
+            const elementPosition = elementRect - bodyRect
+            const offsetPosition = elementPosition - offset
+
+            window.scrollTo({
+                top: offsetPosition,
+                behavior: 'smooth'
+            })
+        }
+    }
+
     return (
         <motion.nav
             initial={{ y: -100 }}
@@ -16,13 +34,15 @@ export function Navbar() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
                     {/* Logo */}
-                    <Logo size="md" />
+                    <div className="cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+                        <Logo size="md" href="" />
+                    </div>
 
                     {/* Desktop Links */}
                     <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-                        <Link href="#features" className="hover:text-white transition-colors">Fonctionnalités</Link>
-                        <Link href="#demo" className="hover:text-white transition-colors">Démo</Link>
-                        <Link href="#pricing" className="hover:text-white transition-colors">Tarifs</Link>
+                        <a href="#features" onClick={(e) => handleScroll(e, 'features')} className="hover:text-white transition-colors cursor-pointer">Fonctionnalités</a>
+                        <a href="#demo" onClick={(e) => handleScroll(e, 'demo')} className="hover:text-white transition-colors cursor-pointer">Démo</a>
+                        <a href="#pricing" onClick={(e) => handleScroll(e, 'pricing')} className="hover:text-white transition-colors cursor-pointer">Tarifs</a>
                     </div>
 
                     {/* CTA */}
@@ -30,9 +50,11 @@ export function Navbar() {
                         <Link href="/login" className="text-sm font-medium text-slate-300 hover:text-white hidden sm:block">
                             Connexion
                         </Link>
-                        <Button className="bg-white text-black hover:bg-slate-200 border-none rounded-full px-6 font-semibold">
-                            Essayer Gratuitement
-                        </Button>
+                        <Link href="/register">
+                            <Button className="bg-white text-black hover:bg-slate-200 border-none rounded-full px-6 font-semibold">
+                                Essayer Gratuitement
+                            </Button>
+                        </Link>
                     </div>
                 </div>
             </div>
