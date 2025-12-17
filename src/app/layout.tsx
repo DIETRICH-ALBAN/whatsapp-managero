@@ -6,7 +6,7 @@ import { SmoothScrollProvider } from '@/components/providers/SmoothScrollProvide
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
-  title: 'WhatsApp Manager SaaS',
+  title: 'VibeVendor - Assistant IA Commerce WhatsApp',
   description: 'Plateforme de gestion commerciale intelligente pour PME',
   keywords: ['WhatsApp', 'Business', 'CRM', 'Cameroun', 'PME'],
 }

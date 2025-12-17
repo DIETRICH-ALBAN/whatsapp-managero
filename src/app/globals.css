@@ -1,148 +1,120 @@
 @import "tailwindcss";
 
 /* ========================================
-   THEME BLEU-VIOLET BUSINESS - WhatsApp Manager SaaS
+   THEME DEEP VIOLET & NEON (Business Night)
    ======================================== */
 
 :root {
-  /* Couleurs Primaires */
-  --primary: #6366f1;          /* Indigo-500 */
-  --primary-hover: #4f46e5;    /* Indigo-600 */
-  --primary-light: #a5b4fc;    /* Indigo-300 */
-  
-  /* Couleurs Secondaires */
-  --secondary: #8b5cf6;        /* Violet-500 */
-  --secondary-hover: #7c3aed;  /* Violet-600 */
-  
-  /* Couleurs d'Accent */
-  --accent: #06b6d4;           /* Cyan-500 */
-  
-  /* Backgrounds */
-  --background: #ffffff;
-  --background-secondary: #f8fafc;  /* Slate-50 */
-  --foreground: #0f172a;       /* Slate-900 */
-  --foreground-muted: #64748b; /* Slate-500 */
-  
-  /* Borders */
-  --border: #e2e8f0;           /* Slate-200 */
-  --border-hover: #cbd5e1;     /* Slate-300 */
-  
-  /* Cards */
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  
-  /* Inputs */
-  --input: #f1f5f9;
-  --input-border: #e2e8f0;
-  
-  /* Radius */
-  --radius: 0.75rem;
-}
+  /* Palette Principale - Dark Mode First */
+  --background: #09090b;
+  /* Zinc-950 (Presque noir) */
+  --background-deep: #020617;
+  /* Slate-950 (Fond profond) */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0f0f23;
-    --background-secondary: #1a1a2e;
-    --foreground: #f1f5f9;
-    --foreground-muted: #94a3b8;
-    
-    --border: #334155;
-    --border-hover: #475569;
-    
-    --card: #1e1e32;
-    --card-foreground: #f1f5f9;
-    
-    --input: #1e293b;
-    --input-border: #334155;
-  }
+  /* Accents Néons */
+  --primary: #8b5cf6;
+  /* Violet-500 */
+  --primary-glow: #7c3aed;
+  /* Violet-600 */
+  --secondary: #06b6d4;
+  /* Cyan-500 */
+  --accent: #ec4899;
+  /* Pink-500 */
+
+  --foreground: #ffffff;
+  --foreground-muted: #94a3b8;
+  /* Slate-400 */
+
+  --border: #1e293b;
+  /* Slate-800 */
+  --card-bg: rgba(15, 23, 42, 0.6);
+  /* Glass dark */
+
+  --radius: 1rem;
 }
 
 @theme inline {
   --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background-deep: var(--background-deep);
   --color-primary: var(--primary);
   --color-secondary: var(--secondary);
   --color-accent: var(--accent);
   --color-muted: var(--foreground-muted);
   --color-border: var(--border);
-  --color-card: var(--card);
+  --color-card: var(--card-bg);
   --font-sans: var(--font-inter);
 }
 
-/* Base Styles */
+/* Base */
 body {
-  background: var(--background);
+  background-color: var(--background-deep);
   color: var(--foreground);
-  font-family: 'Inter', system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+  /* Empêche scroll horizontal dû aux animations */
 }
 
-/* Gradient Backgrounds Utility Classes */
-.gradient-primary {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-}
-
-.gradient-subtle {
-  background: linear-gradient(135deg, var(--primary-light) 0%, #c4b5fd 100%);
+/* Utilitaires de Dégradés & Effets */
+.bg-grid-white {
+  background-size: 40px 40px;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
 }
 
 .text-gradient {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  background: linear-gradient(to right, #c4b5fd, #8b5cf6, #06b6d4);
   -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
   background-clip: text;
+  color: transparent;
 }
 
-/* Glass Effect */
-.glass {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+.text-gradient-gold {
+  background: linear-gradient(to right, #fde047, #ea580c);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
-@media (prefers-color-scheme: dark) {
-  .glass {
-    background: rgba(30, 30, 50, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-  }
+.glass-panel {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
 }
 
-/* Button Base Styles */
-.btn-primary {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-  color: white;
-  padding: 0.75rem 1.5rem;
-  border-radius: var(--radius);
-  font-weight: 500;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.39);
+.glow-effect {
+  position: relative;
 }
 
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+.glow-effect::before {
+  content: '';
+  position: absolute;
+  top: -10%;
+  left: -10%;
+  width: 120%;
+  height: 120%;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.4) 0%, transparent 70%);
+  filter: blur(40px);
+  z-index: -1;
+  opacity: 0.6;
+  pointer-events: none;
 }
 
-/* Card Styles */
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+/* Animations Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
 }
 
-/* Input Styles */
-.input {
-  background: var(--input);
-  border: 1px solid var(--input-border);
-  border-radius: calc(var(--radius) - 0.25rem);
-  padding: 0.625rem 0.875rem;
-  transition: border-color 0.15s ease;
+::-webkit-scrollbar-track {
+  background: var(--background-deep);
 }
 
-.input:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
 }
