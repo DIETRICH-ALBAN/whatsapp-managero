@@ -5,11 +5,11 @@ html {
 }
 
 /* ========================================
-   THEME DEEP VIOLET & NEON (Business Night)
+   THEME SYSTEM - Dark Mode Default
    ======================================== */
 
 :root {
-  /* Palette Principale - Dark Mode First */
+  /* Palette Principale - Dark Mode */
   --background: #09090b;
   /* Zinc-950 (Presque noir) */
   --background-deep: #020617;
@@ -35,17 +35,95 @@ html {
   /* Glass dark */
 
   --radius: 1rem;
+
+  /* Specific colors for components */
+  --card-foreground: #ffffff;
+  --popover: #020617;
+  --popover-foreground: #ffffff;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --input: #1e293b;
+  --ring: #8b5cf6;
+}
+
+/* ========================================
+   LIGHT MODE THEME
+   ======================================== */
+.light {
+  --background: #ffffff;
+  --background-deep: #f8fafc;
+  /* Slate-50 */
+
+  --primary: #7c3aed;
+  /* Violet-600 - plus foncé pour contraste */
+  --primary-glow: #8b5cf6;
+  --secondary: #0891b2;
+  /* Cyan-600 */
+  --accent: #db2777;
+  /* Pink-600 */
+
+  --foreground: #0f172a;
+  /* Slate-900 */
+  --foreground-muted: #64748b;
+  /* Slate-500 */
+
+  --border: #e2e8f0;
+  /* Slate-200 */
+  --card-bg: rgba(255, 255, 255, 0.8);
+
+  /* Specific colors for components */
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --input: #e2e8f0;
+  --ring: #7c3aed;
+}
+
+/* Dark mode explicit class */
+.dark {
+  --background: #09090b;
+  --background-deep: #020617;
+  --primary: #8b5cf6;
+  --primary-glow: #7c3aed;
+  --secondary: #06b6d4;
+  --accent: #ec4899;
+  --foreground: #ffffff;
+  --foreground-muted: #94a3b8;
+  --border: #1e293b;
+  --card-bg: rgba(15, 23, 42, 0.6);
+  --card-foreground: #ffffff;
+  --popover: #020617;
+  --popover-foreground: #ffffff;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --input: #1e293b;
+  --ring: #8b5cf6;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-background-deep: var(--background-deep);
+  --color-foreground: var(--foreground);
+  --color-foreground-muted: var(--foreground-muted);
   --color-primary: var(--primary);
   --color-secondary: var(--secondary);
   --color-accent: var(--accent);
-  --color-muted: var(--foreground-muted);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
   --color-card: var(--card-bg);
+  --color-card-foreground: var(--card-foreground);
+  --color-destructive: var(--destructive);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
   --font-sans: var(--font-inter);
 }
 

@@ -19,9 +19,9 @@ export function Hero() {
     return (
         <section className="relative min-h-[110vh] flex items-center pt-20 overflow-hidden bg-background-deep">
             {/* Background Grids & Orbs */}
-            <div className="absolute inset-0 bg-grid-white opacity-[0.03] z-0" />
-            <div className="absolute top-20 right-0 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] z-0" />
-            <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[100px] z-0" />
+            <div className="absolute inset-0 bg-grid-white opacity-[0.03] dark:opacity-[0.03] z-0" />
+            <div className="absolute top-20 right-0 w-[500px] h-[500px] bg-indigo-600/10 dark:bg-indigo-600/20 rounded-full blur-[120px] z-0" />
+            <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-600/5 dark:bg-purple-600/10 rounded-full blur-[100px] z-0" />
 
             {/* Effet Demi-Anneau / Horizon Lumineux (Corrigé & Intensifié) */}
             <div className="absolute bottom-0 left-0 right-0 h-[500px] z-0 overflow-hidden pointer-events-none">
@@ -49,12 +49,12 @@ export function Hero() {
                         <span>Élu Meilleur Outil PME 2025</span>
                     </div>
 
-                    <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight text-white mb-4 sm:mb-6 leading-tight">
+                    <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight text-foreground mb-4 sm:mb-6 leading-tight">
                         Votre Commerce <br className="hidden sm:block" />
                         <span className="text-gradient">Autopilote sur WhatsApp</span>
                     </h1>
 
-                    <p className="text-base sm:text-lg text-slate-400 mb-6 sm:mb-8 max-w-lg mx-auto lg:mx-0 leading-relaxed">
+                    <p className="text-base sm:text-lg text-foreground-muted mb-6 sm:mb-8 max-w-lg mx-auto lg:mx-0 leading-relaxed">
                         Ne perdez plus jamais une vente. Notre IA répond à vos clients Camerounais,
                         prend les commandes et gère votre stock, même quand vous dormez.
                     </p>

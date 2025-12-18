@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/ui/logo'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { Menu, X } from 'lucide-react'
 
 export function Navbar() {
@@ -39,7 +40,7 @@ export function Navbar() {
             initial={{ y: -100 }}
             animate={{ y: 0 }}
             transition={{ duration: 0.5 }}
-            className="fixed top-0 w-full z-50 border-b border-white/5 bg-background-deep/80 backdrop-blur-md"
+            className="fixed top-0 w-full z-50 border-b border-border bg-background-deep/80 backdrop-blur-md"
         >
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
@@ -55,7 +56,7 @@ export function Navbar() {
                                 key={link.id}
                                 href={`#${link.id}`}
                                 onClick={(e) => handleScroll(e, link.id)}
-                                className="hover:text-white transition-colors cursor-pointer"
+                                className="hover:text-foreground transition-colors cursor-pointer"
                             >
                                 {link.label}
                             </a>
@@ -63,12 +64,13 @@ export function Navbar() {
                     </div>
 
                     {/* Desktop CTA */}
-                    <div className="hidden sm:flex items-center gap-4">
-                        <Link href="/login" className="text-sm font-medium text-slate-300 hover:text-white">
+                    <div className="hidden sm:flex items-center gap-3">
+                        <ThemeToggle />
+                        <Link href="/login" className="text-sm font-medium text-slate-300 dark:text-slate-300 hover:text-foreground transition-colors">
                             Connexion
                         </Link>
                         <Link href="/register">
-                            <Button className="bg-white text-black hover:bg-slate-200 border-none rounded-full px-6 font-semibold">
+                            <Button className="bg-primary text-white hover:bg-primary/90 dark:bg-white dark:text-black dark:hover:bg-slate-200 border-none rounded-full px-6 font-semibold">
                                 Essayer Gratuitement
                             </Button>
                         </Link>
@@ -106,16 +108,20 @@ export function Navbar() {
                                     {link.label}
                                 </a>
                             ))}
-                            <div className="pt-4 border-t border-white/10 space-y-3">
+                            <div className="pt-4 border-t border-border space-y-3">
+                                <div className="flex items-center justify-between px-4 py-2">
+                                    <span className="text-sm text-muted-foreground">Thème</span>
+                                    <ThemeToggle />
+                                </div>
                                 <Link
                                     href="/login"
-                                    className="block py-3 px-4 text-lg font-medium text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors text-center"
+                                    className="block py-3 px-4 text-lg font-medium text-foreground-muted hover:text-foreground hover:bg-muted rounded-lg transition-colors text-center"
                                     onClick={() => setMobileMenuOpen(false)}
                                 >
                                     Connexion
                                 </Link>
                                 <Link href="/register" onClick={() => setMobileMenuOpen(false)}>
-                                    <Button className="w-full bg-white text-black hover:bg-slate-200 border-none rounded-full py-3 font-semibold">
+                                    <Button className="w-full bg-primary text-white hover:bg-primary/90 dark:bg-white dark:text-black dark:hover:bg-slate-200 border-none rounded-full py-3 font-semibold">
                                         Essayer Gratuitement
                                     </Button>
                                 </Link>
