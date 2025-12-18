@@ -51,23 +51,23 @@ const features = [
 
 export function Features() {
     return (
-        <section id="features" className="py-24 bg-background-deep relative overflow-hidden">
-            <div className="container mx-auto px-4 z-10 relative">
+        <section id="features" className="py-16 sm:py-20 lg:py-24 bg-background-deep relative overflow-hidden">
+            <div className="container mx-auto px-4 sm:px-6 z-10 relative">
 
-                <div className="text-center max-w-3xl mx-auto mb-16">
-                    <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">
-                        Tout ce dont vous avez besoin pour <br />
+                <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-12 lg:mb-16">
+                    <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 sm:mb-6">
+                        Tout ce dont vous avez besoin pour <br className="hidden sm:block" />
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">
                             Vendre Mieux
                         </span>
                     </h2>
-                    <p className="text-slate-400 text-lg">
+                    <p className="text-slate-400 text-base sm:text-lg px-4 sm:px-0">
                         Une suite d'outils puissants conçus spécifiquement pour le marché africain.
                         Simple, rapide, efficace.
                     </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     {features.map((f, i) => (
                         <motion.div
                             key={i}
@@ -80,7 +80,7 @@ export function Features() {
                                 className="group relative h-full p-1 rounded-2xl bg-gradient-to-b from-white/10 to-transparent hover:from-indigo-500/50 hover:to-purple-500/50 transition-all duration-500"
                             >
                                 <div className="absolute inset-0 bg-background-deep rounded-2xl m-[1px] z-0" />
-                                <div className="relative z-10 p-8 h-full flex flex-col items-start bg-white/5 backdrop-blur-sm rounded-xl hover:bg-white/10 transition-colors">
+                                <div className="relative z-10 p-5 sm:p-8 h-full flex flex-col items-start bg-white/5 backdrop-blur-sm rounded-xl hover:bg-white/10 transition-colors">
 
                                     <div className={`p-3 rounded-lg bg-white/5 mb-6 ${f.color} group-hover:scale-110 transition-transform duration-300`}>
                                         <f.icon className="w-8 h-8" />

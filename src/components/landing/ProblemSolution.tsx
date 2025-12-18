@@ -10,19 +10,19 @@ export function ProblemSolution() {
             {/* Background Ambience */}
             <div className="absolute top-1/2 left-0 w-full h-[500px] bg-gradient-to-r from-red-500/5 via-transparent to-indigo-500/5 blur-[120px] -translate-y-1/2 pointer-events-none" />
 
-            <div className="container mx-auto px-4 relative z-10">
+            <div className="container mx-auto px-4 sm:px-6 relative z-10">
 
                 {/* Header Section */}
-                <div className="text-center max-w-3xl mx-auto mb-20">
+                <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16 lg:mb-20">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
                     >
-                        <h2 className="text-4xl md:text-6xl font-bold text-white mb-6 tracking-tight">
+                        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white mb-4 sm:mb-6 tracking-tight">
                             Passez du <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400 opacity-80">Chaos</span> à la <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Maîtrise</span>.
                         </h2>
-                        <p className="text-lg text-slate-400/80 leading-relaxed">
+                        <p className="text-base sm:text-lg text-slate-400/80 leading-relaxed px-4 sm:px-0">
                             La gestion manuelle freine votre croissance. Adoptez l'infrastructure qui propulse les leaders du marché.
                         </p>
                     </motion.div>

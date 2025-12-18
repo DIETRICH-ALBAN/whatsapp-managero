@@ -35,40 +35,40 @@ export function Hero() {
                 <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-50" />
             </div>
 
-            <div className="container relative z-10 mx-auto px-4 grid lg:grid-cols-2 gap-12 items-center">
+            <div className="container relative z-10 mx-auto px-4 sm:px-6 grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
 
                 {/* Text Content */}
                 <motion.div
                     initial={{ opacity: 0, x: -50 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.8, ease: "easeOut" }}
-                    className="max-w-2xl"
+                    className="max-w-2xl mx-auto lg:mx-0 text-center lg:text-left"
                 >
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 text-xs font-medium mb-6">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 text-xs font-medium mb-4 sm:mb-6">
                         <Trophy className="w-3 h-3 text-yellow-500" />
                         <span>Élu Meilleur Outil PME 2025</span>
                     </div>
 
-                    <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-white mb-6 leading-tight">
-                        Votre Commerce <br />
+                    <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight text-white mb-4 sm:mb-6 leading-tight">
+                        Votre Commerce <br className="hidden sm:block" />
                         <span className="text-gradient">Autopilote sur WhatsApp</span>
                     </h1>
 
-                    <p className="text-lg text-slate-400 mb-8 max-w-lg leading-relaxed">
+                    <p className="text-base sm:text-lg text-slate-400 mb-6 sm:mb-8 max-w-lg mx-auto lg:mx-0 leading-relaxed">
                         Ne perdez plus jamais une vente. Notre IA répond à vos clients Camerounais,
                         prend les commandes et gère votre stock, même quand vous dormez.
                     </p>
 
-                    <div className="flex flex-col sm:flex-row gap-4">
-                        <Button size="lg" className="rounded-full h-14 px-8 text-base bg-indigo-600 hover:bg-indigo-700 shadow-[0_0_30px_rgba(79,70,229,0.4)]">
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center lg:justify-start">
+                        <Button size="lg" className="rounded-full h-12 sm:h-14 px-6 sm:px-8 text-sm sm:text-base bg-indigo-600 hover:bg-indigo-700 shadow-[0_0_30px_rgba(79,70,229,0.4)]">
                             Démarrer Gratuitement <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
-                        <Button size="lg" variant="outline" className="rounded-full h-14 px-8 text-base border-slate-700 hover:bg-slate-800 text-slate-300">
+                        <Button size="lg" variant="outline" className="rounded-full h-12 sm:h-14 px-6 sm:px-8 text-sm sm:text-base border-slate-700 hover:bg-slate-800 text-slate-300">
                             Voir la Démo Live
                         </Button>
                     </div>
 
-                    <div className="mt-10 flex items-center gap-6 text-sm text-slate-500 font-medium">
+                    <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-center gap-3 sm:gap-6 text-sm text-slate-500 font-medium justify-center lg:justify-start">
                         <div className="flex -space-x-3">
                             {[1, 2, 3, 4].map(i => (
                                 <div key={i} className={`w-8 h-8 rounded-full border-2 border-background-deep bg-slate-800 flex items-center justify-center text-xs text-white`}>

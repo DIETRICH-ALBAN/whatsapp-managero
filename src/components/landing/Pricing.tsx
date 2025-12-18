@@ -68,15 +68,15 @@ export function Pricing() {
     ]
 
     return (
-        <section id="pricing" className="py-32 bg-background-deep relative overflow-hidden">
-            <div className="container mx-auto px-4 z-10 relative">
+        <section id="pricing" className="py-16 sm:py-24 lg:py-32 bg-background-deep relative overflow-hidden">
+            <div className="container mx-auto px-4 sm:px-6 z-10 relative">
 
                 {/* Header Section */}
-                <div className="text-center max-w-3xl mx-auto mb-16">
-                    <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">
+                <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-12 lg:mb-16">
+                    <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 sm:mb-6">
                         Choisissez le plan parfait
                     </h2>
-                    <p className="text-slate-400 mb-8">
+                    <p className="text-slate-400 mb-6 sm:mb-8 text-sm sm:text-base px-4 sm:px-0">
                         Des solutions adaptées à chaque étape de votre croissance, du testeur à la PME établie.
                     </p>
 
@@ -100,7 +100,7 @@ export function Pricing() {
                 </div>
 
                 {/* Pricing Grid */}
-                <div className="grid lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-7xl mx-auto">
                     {plans.map((plan, i) => (
                         <motion.div
                             key={i}
@@ -108,7 +108,7 @@ export function Pricing() {
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                             transition={{ delay: i * 0.1 }}
-                            className={`relative flex flex-col h-full bg-[#0F0F13] rounded-[2rem] border overflow-hidden transition-all duration-300 ${plan.isPopular ? 'border-purple-500/50 shadow-[0_0_40px_rgba(168,85,247,0.15)] scale-105 z-10' : 'border-white/5 hover:border-white/10'
+                            className={`relative flex flex-col h-full bg-[#0F0F13] rounded-2xl sm:rounded-[2rem] border overflow-hidden transition-all duration-300 ${plan.isPopular ? 'border-purple-500/50 shadow-[0_0_40px_rgba(168,85,247,0.15)] lg:scale-105 z-10' : 'border-white/5 hover:border-white/10'
                                 }`}
                         >
                             {/* Fluid Header Effect */}
@@ -117,16 +117,16 @@ export function Pricing() {
                                 <div className={`absolute -top-12 right-0 w-48 h-48 bg-gradient-to-bl ${plan.color} rounded-full blur-[60px] opacity-60`} />
                             </div>
 
-                            <div className="relative z-10 p-8 flex flex-col h-full">
+                            <div className="relative z-10 p-5 sm:p-8 flex flex-col h-full">
                                 {/* Plan Name & Desc */}
-                                <div className="mb-6">
+                                <div className="mb-4 sm:mb-6">
                                     {plan.isPopular && (
-                                        <span className="absolute top-8 right-8 px-3 py-1 bg-white text-black text-xs font-bold rounded-full">
+                                        <span className="absolute top-5 right-5 sm:top-8 sm:right-8 px-3 py-1 bg-white text-black text-xs font-bold rounded-full">
                                             Populaire
                                         </span>
                                     )}
-                                    <h3 className="text-xl font-medium text-white mb-2">{plan.name}</h3>
-                                    <p className="text-sm text-slate-400 h-10">{plan.description}</p>
+                                    <h3 className="text-lg sm:text-xl font-medium text-white mb-2">{plan.name}</h3>
+                                    <p className="text-sm text-slate-400 h-auto sm:h-10">{plan.description}</p>
                                 </div>
 
                                 {/* Price */}
@@ -143,8 +143,8 @@ export function Pricing() {
                                 {/* Button */}
                                 <Button
                                     className={`w-full h-12 rounded-xl mb-10 font-medium transition-all ${plan.isPopular
-                                            ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 border-0 text-white shadow-lg'
-                                            : 'bg-white/5 hover:bg-white/10 text-white border-0'
+                                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 border-0 text-white shadow-lg'
+                                        : 'bg-white/5 hover:bg-white/10 text-white border-0'
                                         }`}
                                 >
                                     {plan.price === 0 ? 'Commencer' : 'Choisir ce plan'}
@@ -156,8 +156,8 @@ export function Pricing() {
                                     {plan.features.map((feat, j) => (
                                         <div key={j} className="flex items-start gap-3 text-sm">
                                             <div className={`mt-0.5 min-w-[18px] h-[18px] rounded-full flex items-center justify-center ${feat.included
-                                                    ? `bg-gradient-to-br ${plan.color} text-black`
-                                                    : 'bg-slate-800 text-slate-500'
+                                                ? `bg-gradient-to-br ${plan.color} text-black`
+                                                : 'bg-slate-800 text-slate-500'
                                                 }`}>
                                                 {feat.included ? <Check className="w-3 h-3 text-white" /> : <X className="w-3 h-3" />}
                                             </div>

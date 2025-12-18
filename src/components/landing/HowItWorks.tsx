@@ -20,42 +20,42 @@ const features = [
 
 export function HowItWorks() {
     return (
-        <section className="py-32 bg-background-deep relative overflow-hidden">
+        <section className="py-16 sm:py-24 lg:py-32 bg-background-deep relative overflow-hidden">
             {/* Background Glow */}
-            <div className="absolute top-1/2 right-0 w-[800px] h-[800px] bg-indigo-600/10 rounded-full blur-[120px] -translate-y-1/2 z-0 pointer-events-none" />
+            <div className="absolute top-1/2 right-0 w-[400px] sm:w-[600px] lg:w-[800px] h-[400px] sm:h-[600px] lg:h-[800px] bg-indigo-600/10 rounded-full blur-[80px] sm:blur-[120px] -translate-y-1/2 z-0 pointer-events-none" />
 
-            <div className="container mx-auto px-4 relative z-10">
-                <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div className="container mx-auto px-4 sm:px-6 relative z-10">
+                <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
 
                     {/* Left Content: Text & Features */}
                     <motion.div
                         initial={{ opacity: 0, x: -30 }}
                         whileInView={{ opacity: 1, x: 0 }}
                         viewport={{ once: true }}
-                        className="space-y-8"
+                        className="space-y-6 sm:space-y-8 text-center lg:text-left"
                     >
-                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-indigo-300 text-sm font-medium">
+                        <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-white/5 border border-white/10 text-indigo-300 text-xs sm:text-sm font-medium">
                             <Sparkles className="w-4 h-4" />
                             <span>Intelligence Artificielle</span>
                         </div>
 
-                        <h2 className="text-4xl md:text-5xl font-bold text-white leading-tight">
+                        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-tight">
                             Une IA qui <span className="text-gradient">comprend</span> vraiment vos clients
                         </h2>
 
-                        <p className="text-lg text-slate-400 leading-relaxed">
+                        <p className="text-base sm:text-lg text-slate-400 leading-relaxed max-w-lg mx-auto lg:mx-0">
                             Notre technologie analyse chaque message WhatsApp, détecte les intentions d'achat et répond de manière naturelle pour conclure la vente.
                         </p>
 
-                        <div className="space-y-6 pt-4">
+                        <div className="space-y-4 sm:space-y-6 pt-4 text-left">
                             {features.map((f, i) => (
-                                <div key={i} className="flex gap-4">
-                                    <div className="mt-1 w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/30">
-                                        <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+                                <div key={i} className="flex gap-3 sm:gap-4">
+                                    <div className="mt-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-indigo-500 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/30">
+                                        <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" strokeWidth={3} />
                                     </div>
                                     <div>
-                                        <h4 className="text-white font-bold text-lg">{f.title}</h4>
-                                        <p className="text-slate-500 leading-relaxed">{f.desc}</p>
+                                        <h4 className="text-white font-bold text-base sm:text-lg">{f.title}</h4>
+                                        <p className="text-slate-500 leading-relaxed text-sm sm:text-base">{f.desc}</p>
                                     </div>
                                 </div>
                             ))}
