@@ -39,11 +39,11 @@ export function HowItWorks() {
                             <span>Intelligence Artificielle</span>
                         </div>
 
-                        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-tight">
+                        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-foreground leading-tight">
                             Une IA qui <span className="text-gradient">comprend</span> vraiment vos clients
                         </h2>
 
-                        <p className="text-base sm:text-lg text-slate-400 leading-relaxed max-w-lg mx-auto lg:mx-0">
+                        <p className="text-base sm:text-lg text-foreground-muted leading-relaxed max-w-lg mx-auto lg:mx-0">
                             Notre technologie analyse chaque message WhatsApp, détecte les intentions d'achat et répond de manière naturelle pour conclure la vente.
                         </p>
 
@@ -54,8 +54,8 @@ export function HowItWorks() {
                                         <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" strokeWidth={3} />
                                     </div>
                                     <div>
-                                        <h4 className="text-white font-bold text-base sm:text-lg">{f.title}</h4>
-                                        <p className="text-slate-500 leading-relaxed text-sm sm:text-base">{f.desc}</p>
+                                        <h4 className="text-foreground font-bold text-base sm:text-lg">{f.title}</h4>
+                                        <p className="text-muted-foreground leading-relaxed text-sm sm:text-base">{f.desc}</p>
                                     </div>
                                 </div>
                             ))}
@@ -73,9 +73,9 @@ export function HowItWorks() {
                         {/* Outline Glow Effect */}
                         <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-[2rem] blur opacity-30" />
 
-                        <div className="relative bg-[#1a1a22] border border-white/10 rounded-[2rem] overflow-hidden shadow-2xl">
+                        <div className="relative bg-[#0b141a] dark:bg-[#1a1a22] border border-white/10 rounded-[2rem] overflow-hidden shadow-2xl">
                             {/* Chat Header */}
-                            <div className="bg-[#23232f] p-4 flex items-center justify-between border-b border-white/5">
+                            <div className="bg-[#1f2c34] dark:bg-[#23232f] p-4 flex items-center justify-between border-b border-white/5">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-full bg-green-600 flex items-center justify-center text-white">
                                         <Phone className="w-5 h-5" fill="currentColor" />
@@ -143,11 +143,11 @@ export function HowItWorks() {
                             </div>
 
                             {/* Fake Input */}
-                            <div className="p-3 bg-[#23232f] flex gap-2 items-center border-t border-white/5">
+                            <div className="p-3 bg-[#1f2c34] dark:bg-[#23232f] flex gap-2 items-center border-t border-white/5">
                                 <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-slate-400">
                                     <span className="text-lg">+</span>
                                 </div>
-                                <div className="flex-1 bg-[#1a1a22] h-10 rounded-full px-4 flex items-center text-sm text-slate-500 border border-white/5">
+                                <div className="flex-1 bg-[#2a3942] dark:bg-[#1a1a22] h-10 rounded-full px-4 flex items-center text-sm text-slate-400 border border-white/5">
                                     Je veux commander...
                                 </div>
                                 <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/20">

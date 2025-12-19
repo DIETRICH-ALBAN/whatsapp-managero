@@ -137,6 +137,7 @@ body {
 }
 
 /* Utilitaires de Dégradés & Effets */
+/* Utilitaires de Dégradés & Effets */
 .bg-grid-white {
   background-size: 40px 40px;
   background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
@@ -144,11 +145,20 @@ body {
   mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
 }
 
+.light .bg-grid-white {
+  background-image: linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+}
+
 .text-gradient {
   background: linear-gradient(to right, #c4b5fd, #8b5cf6, #06b6d4);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+.light .text-gradient {
+  background: linear-gradient(to right, #7c3aed, #4f46e5, #0891b2);
 }
 
 .text-gradient-gold {
@@ -163,6 +173,12 @@ body {
   backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+.light .glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
 .glow-effect {

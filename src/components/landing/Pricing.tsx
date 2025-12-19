@@ -73,28 +73,28 @@ export function Pricing() {
 
                 {/* Header Section */}
                 <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-12 lg:mb-16">
-                    <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 sm:mb-6">
+                    <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4 sm:mb-6">
                         Choisissez le plan parfait
                     </h2>
-                    <p className="text-slate-400 mb-6 sm:mb-8 text-sm sm:text-base px-4 sm:px-0">
+                    <p className="text-muted-foreground mb-6 sm:mb-8 text-sm sm:text-base px-4 sm:px-0">
                         Des solutions adaptées à chaque étape de votre croissance, du testeur à la PME établie.
                     </p>
 
                     {/* Toggle Mensuel/Annuel */}
                     <div className="flex items-center justify-center gap-4">
-                        <span className={`text-sm ${!isAnnual ? 'text-white font-medium' : 'text-slate-500'}`}>Mensuel</span>
+                        <span className={`text-sm ${!isAnnual ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>Mensuel</span>
                         <div
                             onClick={() => setIsAnnual(!isAnnual)}
-                            className="w-14 h-7 bg-slate-800 rounded-full p-1 cursor-pointer relative transition-colors hover:bg-slate-700 border border-slate-700"
+                            className="w-14 h-7 bg-muted rounded-full p-1 cursor-pointer relative transition-colors hover:bg-muted/80 border border-border"
                         >
                             <motion.div
                                 layout
-                                className="w-5 h-5 bg-indigo-500 rounded-full shadow-md"
+                                className="w-5 h-5 bg-primary rounded-full shadow-md"
                                 animate={{ x: isAnnual ? 28 : 0 }}
                             />
                         </div>
-                        <span className={`text-sm ${isAnnual ? 'text-white font-medium' : 'text-slate-500'}`}>
-                            Annuel <span className="text-green-400 text-xs font-bold ml-1">-20%</span>
+                        <span className={`text-sm ${isAnnual ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                            Annuel <span className="text-green-500 text-xs font-bold ml-1">-20%</span>
                         </span>
                     </div>
                 </div>
@@ -108,7 +108,7 @@ export function Pricing() {
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                             transition={{ delay: i * 0.1 }}
-                            className={`relative flex flex-col h-full bg-[#0F0F13] rounded-2xl sm:rounded-[2rem] border overflow-hidden transition-all duration-300 ${plan.isPopular ? 'border-purple-500/50 shadow-[0_0_40px_rgba(168,85,247,0.15)] lg:scale-105 z-10' : 'border-white/5 hover:border-white/10'
+                            className={`relative flex flex-col h-full bg-card rounded-2xl sm:rounded-[2rem] border overflow-hidden transition-all duration-300 ${plan.isPopular ? 'border-purple-500/50 shadow-[0_0_40px_rgba(168,85,247,0.15)] lg:scale-105 z-10' : 'border-border hover:border-primary/20'
                                 }`}
                         >
                             {/* Fluid Header Effect */}
@@ -125,26 +125,26 @@ export function Pricing() {
                                             Populaire
                                         </span>
                                     )}
-                                    <h3 className="text-lg sm:text-xl font-medium text-white mb-2">{plan.name}</h3>
-                                    <p className="text-sm text-slate-400 h-auto sm:h-10">{plan.description}</p>
+                                    <h3 className="text-lg sm:text-xl font-medium text-foreground mb-2">{plan.name}</h3>
+                                    <p className="text-sm text-muted-foreground h-auto sm:h-10">{plan.description}</p>
                                 </div>
 
                                 {/* Price */}
                                 <div className="mb-8">
                                     <div className="flex items-baseline gap-1">
-                                        <span className="text-4xl font-bold text-white">
+                                        <span className="text-4xl font-bold text-foreground">
                                             {plan.price === 0 ? 'Gratuit' : plan.price.toLocaleString()}
                                         </span>
-                                        {plan.price > 0 && <span className="text-lg text-slate-500">FCFA</span>}
+                                        {plan.price > 0 && <span className="text-lg text-muted-foreground">FCFA</span>}
                                     </div>
-                                    <span className="text-sm text-slate-500">/{plan.period}</span>
+                                    <span className="text-sm text-muted-foreground">/{plan.period}</span>
                                 </div>
 
                                 {/* Button */}
                                 <Button
                                     className={`w-full h-12 rounded-xl mb-10 font-medium transition-all ${plan.isPopular
                                         ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 border-0 text-white shadow-lg'
-                                        : 'bg-white/5 hover:bg-white/10 text-white border-0'
+                                        : 'bg-secondary/10 hover:bg-secondary/20 text-foreground border-0 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white'
                                         }`}
                                 >
                                     {plan.price === 0 ? 'Commencer' : 'Choisir ce plan'}
@@ -156,12 +156,12 @@ export function Pricing() {
                                     {plan.features.map((feat, j) => (
                                         <div key={j} className="flex items-start gap-3 text-sm">
                                             <div className={`mt-0.5 min-w-[18px] h-[18px] rounded-full flex items-center justify-center ${feat.included
-                                                ? `bg-gradient-to-br ${plan.color} text-black`
-                                                : 'bg-slate-800 text-slate-500'
+                                                ? `bg-gradient-to-br ${plan.color} text-black shadow-sm`
+                                                : 'bg-muted text-muted-foreground'
                                                 }`}>
                                                 {feat.included ? <Check className="w-3 h-3 text-white" /> : <X className="w-3 h-3" />}
                                             </div>
-                                            <span className={feat.included ? 'text-slate-300' : 'text-slate-600 line-through decoration-slate-700'}>
+                                            <span className={feat.included ? 'text-foreground/90' : 'text-muted-foreground line-through decoration-muted-foreground/50'}>
                                                 {feat.text}
                                             </span>
                                         </div>

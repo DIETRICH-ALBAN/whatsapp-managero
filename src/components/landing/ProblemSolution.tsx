@@ -19,10 +19,10 @@ export function ProblemSolution() {
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
                     >
-                        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white mb-4 sm:mb-6 tracking-tight">
+                        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-4 sm:mb-6 tracking-tight">
                             Passez du <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400 opacity-80">Chaos</span> à la <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Maîtrise</span>.
                         </h2>
-                        <p className="text-base sm:text-lg text-slate-400/80 leading-relaxed px-4 sm:px-0">
+                        <p className="text-base sm:text-lg text-foreground-muted leading-relaxed px-4 sm:px-0">
                             La gestion manuelle freine votre croissance. Adoptez l'infrastructure qui propulse les leaders du marché.
                         </p>
                     </motion.div>
@@ -39,7 +39,7 @@ export function ProblemSolution() {
                     >
                         <div className="absolute inset-0 bg-gradient-to-b from-red-500/5 to-transparent rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
 
-                        <Card className="h-full bg-[#0a0a0a] border-white/5 p-8 md:p-12 rounded-3xl relative overflow-hidden">
+                        <Card className="h-full bg-card border-border p-8 md:p-12 rounded-3xl relative overflow-hidden">
                             {/* Noise texture overlay */}
                             <div className="absolute inset-0 opacity-[0.03] bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
 
@@ -58,8 +58,8 @@ export function ProblemSolution() {
                                         "Oubli de relance des prospects",
                                         "Surcharge mentale quotidienne"
                                     ].map((item, i) => (
-                                        <li key={i} className="flex items-start gap-4 text-slate-500 group-hover:text-slate-400 transition-colors">
-                                            <X className="w-6 h-6 text-red-900/50 mt-0.5 shrink-0" />
+                                        <li key={i} className="flex items-start gap-4 text-foreground-muted group-hover:text-foreground/80 transition-colors">
+                                            <X className="w-6 h-6 text-red-500/50 mt-0.5 shrink-0" />
                                             <span className="text-lg">{item}</span>
                                         </li>
                                     ))}
@@ -80,7 +80,7 @@ export function ProblemSolution() {
                         <div className="absolute -inset-[1px] bg-gradient-to-b from-indigo-500 to-purple-600 rounded-3xl blur-sm opacity-50" />
                         <div className="absolute -inset-[1px] bg-gradient-to-b from-indigo-500 to-purple-600 rounded-3xl opacity-20" />
 
-                        <Card className="h-full bg-[#0f0f16] border-transparent p-8 md:p-12 rounded-3xl relative overflow-hidden">
+                        <Card className="h-full bg-card border-primary/20 p-8 md:p-12 rounded-3xl relative overflow-hidden shadow-xl dark:shadow-indigo-900/10">
 
                             {/* Ambient Glow */}
                             <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-bl from-indigo-500/10 via-transparent to-transparent pointer-events-none" />
@@ -106,17 +106,17 @@ export function ProblemSolution() {
                                         "Pilotage depuis un Dashboard Zen"
                                     ].map((item, i) => (
                                         <li key={i} className="flex items-start gap-4">
-                                            <div className="mt-0.5 p-0.5 rounded-full bg-indigo-500/20 text-indigo-400">
+                                            <div className="mt-0.5 p-0.5 rounded-full bg-primary/20 text-primary">
                                                 <Check className="w-4 h-4" />
                                             </div>
-                                            <span className="text-lg text-white font-medium">{item}</span>
+                                            <span className="text-lg text-foreground font-medium">{item}</span>
                                         </li>
                                     ))}
                                 </ul>
 
                                 {/* Visual Bonus */}
-                                <div className="mt-10 pt-8 border-t border-white/5">
-                                    <div className="flex items-center gap-4 text-slate-400 text-sm">
+                                <div className="mt-10 pt-8 border-t border-border">
+                                    <div className="flex items-center gap-4 text-foreground-muted text-sm">
                                         <span>Résultat estimé :</span>
                                         <div className="flex items-center gap-2 text-green-400 font-bold">
                                             <ArrowRight className="w-4 h-4" />
