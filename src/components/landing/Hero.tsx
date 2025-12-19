@@ -51,7 +51,7 @@ export function Hero() {
 
                     <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight text-foreground mb-4 sm:mb-6 leading-tight">
                         Votre Commerce <br className="hidden sm:block" />
-                        <span className="text-gradient">Autopilote sur WhatsApp</span>
+                        <span className="text-gradient pb-2 inline-block">Autopilote sur WhatsApp</span>
                     </h1>
 
                     <p className="text-base sm:text-lg text-foreground-muted mb-6 sm:mb-8 max-w-lg mx-auto lg:mx-0 leading-relaxed">
@@ -60,10 +60,10 @@ export function Hero() {
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center lg:justify-start">
-                        <Button size="lg" className="rounded-full h-12 sm:h-14 px-6 sm:px-8 text-sm sm:text-base bg-indigo-600 hover:bg-indigo-700 shadow-[0_0_30px_rgba(79,70,229,0.4)]">
+                        <Button size="lg" className="rounded-full h-12 sm:h-14 px-6 sm:px-8 text-sm sm:text-base bg-primary text-white hover:bg-primary/90 shadow-[0_0_30px_rgba(124,58,237,0.3)] border-none">
                             Démarrer Gratuitement <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
-                        <Button size="lg" variant="outline" className="rounded-full h-12 sm:h-14 px-6 sm:px-8 text-sm sm:text-base border-slate-700 hover:bg-slate-800 text-slate-300">
+                        <Button size="lg" variant="outline" className="rounded-full h-12 sm:h-14 px-6 sm:px-8 text-sm sm:text-base border-input text-foreground hover:bg-muted hover:text-foreground">
                             Voir la Démo Live
                         </Button>
                     </div>
@@ -76,7 +76,7 @@ export function Hero() {
                                 </div>
                             ))}
                         </div>
-                        <p>Déjà utilisé par <span className="text-white">500+ commerçants</span> au Cameroun</p>
+                        <p className="text-muted-foreground">Déjà utilisé par <span className="text-foreground font-bold">500+ commerçants</span> au Cameroun</p>
                     </div>
                 </motion.div>
 
