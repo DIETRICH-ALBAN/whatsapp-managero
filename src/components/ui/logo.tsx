@@ -67,8 +67,8 @@ export function Logo({ size = 'md', href = '/', className = '' }: LogoProps) {
 
             {/* Text: vibevendor */}
             <span className={`font-bold tracking-tight ${s.text}`}>
-                <span className="text-white">vibe</span>
-                <span className="text-indigo-400">vendor</span>
+                <span className="text-foreground">vibe</span>
+                <span className="text-indigo-500">vendor</span>
             </span>
         </div>
     )

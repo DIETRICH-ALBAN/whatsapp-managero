@@ -51,37 +51,45 @@ html {
 /* ========================================
    LIGHT MODE THEME
    ======================================== */
+/* ========================================
+   LIGHT MODE THEME (Style "Soft UI Premium")
+   ======================================== */
 .light {
+  /* Fond de page : Gris doux/Stone clair (comme l'image) */
   --background: #ffffff;
-  --background-deep: #f8fafc;
-  /* Slate-50 */
+  --background-deep: #f3f4f6;
+  /* Gray-100/Stone-100 - Le fond gris clair */
 
+  /* Accents : Violet Vibrant "Électrique" */
   --primary: #7c3aed;
-  /* Violet-600 - plus foncé pour contraste */
+  /* Violet-600 vibrant */
   --primary-glow: #8b5cf6;
-  --secondary: #0891b2;
-  /* Cyan-600 */
-  --accent: #db2777;
-  /* Pink-600 */
+  --secondary: #0ea5e9;
+  /* Sky-500 */
+  --accent: #d946ef;
+  /* Fuchsia-500 */
 
-  --foreground: #0f172a;
-  /* Slate-900 */
-  --foreground-muted: #64748b;
-  /* Slate-500 */
+  --foreground: #111827;
+  /* Gray-900 (Presque noir pour fort contraste) */
+  --foreground-muted: #6b7280;
+  /* Gray-500 (Texte secondaire doux) */
 
-  --border: #e2e8f0;
-  /* Slate-200 */
-  --card-bg: rgba(255, 255, 255, 0.8);
+  /* Cartes : Blanc Pur avec ombres, pas de gris */
+  --card-bg: #ffffff;
+
+  --border: #e5e7eb;
+  /* Gray-200 (Bordures très subtiles) */
 
   /* Specific colors for components */
-  --card-foreground: #0f172a;
+  --card-foreground: #111827;
   --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --destructive: #dc2626;
+  --popover-foreground: #111827;
+  --muted: #f3f4f6;
+  /* Gray-100 */
+  --muted-foreground: #6b7280;
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --input: #e2e8f0;
+  --input: #e5e7eb;
   --ring: #7c3aed;
 }
 
@@ -146,8 +154,8 @@ body {
 }
 
 .light .bg-grid-white {
-  background-image: linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+  background-image: linear-gradient(to right, rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
 }
 
 .text-gradient {
@@ -158,7 +166,8 @@ body {
 }
 
 .light .text-gradient {
-  background: linear-gradient(to right, #7c3aed, #4f46e5, #0891b2);
+  background: linear-gradient(to right, #7c3aed, #9333ea, #db2777);
+  /* Violet to Pink vibrant */
 }
 
 .text-gradient-gold {
@@ -176,9 +185,12 @@ body {
 }
 
 .light .glass-panel {
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.85);
+  /* Plus opaque/blanc */
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  /* Bordure blanche subtile */
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.08);
+  /* Ombre douce et large */
 }
 
 .glow-effect {

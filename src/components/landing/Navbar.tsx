@@ -50,13 +50,13 @@ export function Navbar() {
                     </div>
 
                     {/* Desktop Links */}
-                    <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
+                    <div className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
                         {navLinks.map((link) => (
                             <a
                                 key={link.id}
                                 href={`#${link.id}`}
                                 onClick={(e) => handleScroll(e, link.id)}
-                                className="hover:text-foreground transition-colors cursor-pointer"
+                                className="hover:text-primary transition-colors cursor-pointer"
                             >
                                 {link.label}
                             </a>
@@ -66,11 +66,11 @@ export function Navbar() {
                     {/* Desktop CTA */}
                     <div className="hidden sm:flex items-center gap-3">
                         <ThemeToggle />
-                        <Link href="/login" className="text-sm font-medium text-slate-300 dark:text-slate-300 hover:text-foreground transition-colors">
+                        <Link href="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                             Connexion
                         </Link>
                         <Link href="/register">
-                            <Button className="bg-primary text-white hover:bg-primary/90 dark:bg-white dark:text-black dark:hover:bg-slate-200 border-none rounded-full px-6 font-semibold">
+                            <Button className="bg-primary text-white hover:bg-primary/90 border-none rounded-full px-6 font-semibold shadow-md hover:shadow-lg transition-all dark:bg-white dark:text-black">
                                 Essayer Gratuitement
                             </Button>
                         </Link>
@@ -78,7 +78,7 @@ export function Navbar() {
 
                     {/* Mobile Menu Button */}
                     <button
-                        className="sm:hidden p-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+                        className="sm:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                         aria-label="Toggle menu"
                     >
@@ -103,7 +103,7 @@ export function Navbar() {
                                     key={link.id}
                                     href={`#${link.id}`}
                                     onClick={(e) => handleScroll(e, link.id)}
-                                    className="block py-3 px-4 text-lg font-medium text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                                    className="block py-3 px-4 text-lg font-medium text-muted-foreground hover:text-primary hover:bg-muted rounded-lg transition-colors"
                                 >
                                     {link.label}
                                 </a>
