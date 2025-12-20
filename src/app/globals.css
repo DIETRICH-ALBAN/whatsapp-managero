@@ -158,22 +158,31 @@ body {
     linear-gradient(to bottom, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
 }
 
+/* Fix du Text Gradient : nécessite -webkit-background-clip explicitement */
 .text-gradient {
   background: linear-gradient(to right, #c4b5fd, #8b5cf6, #06b6d4);
   -webkit-background-clip: text;
   background-clip: text;
+  -webkit-text-fill-color: transparent;
   color: transparent;
+  display: inline-block;
+  /* Assure que le gradient s'applique bien au flow du texte */
 }
 
 .light .text-gradient {
-  background: linear-gradient(to right, #7c3aed, #9333ea, #db2777);
-  /* Violet to Pink vibrant */
+  background: linear-gradient(to right, #7c3aed, #db2777);
+  /* Violet to Pink plus solide */
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 .text-gradient-gold {
   background: linear-gradient(to right, #fde047, #ea580c);
   -webkit-background-clip: text;
   background-clip: text;
+  -webkit-text-fill-color: transparent;
   color: transparent;
 }
 

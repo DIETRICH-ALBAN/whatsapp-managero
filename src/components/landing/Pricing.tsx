@@ -144,7 +144,7 @@ export function Pricing() {
                                 <Button
                                     className={`w-full h-12 rounded-xl mb-10 font-medium transition-all ${plan.isPopular
                                         ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 border-0 text-white shadow-lg'
-                                        : 'bg-muted text-foreground hover:bg-muted/80 border-0 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white'
+                                        : 'bg-slate-100 text-slate-900 hover:bg-slate-200 border border-slate-200 dark:bg-white/5 dark:text-white dark:hover:bg-white/10 dark:border-white/5'
                                         }`}
                                 >
                                     {plan.price === 0 ? 'Commencer' : 'Choisir ce plan'}
