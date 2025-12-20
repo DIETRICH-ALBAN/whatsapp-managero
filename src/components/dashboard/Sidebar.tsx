@@ -35,10 +35,10 @@ export function Sidebar() {
     return (
         <motion.div
             animate={{ width: collapsed ? 80 : 280 }}
-            className="relative h-screen bg-white dark:bg-[#0B0B0F] border-r border-slate-200 dark:border-white/5 flex flex-col z-20 transition-all duration-300 ease-in-out"
+            className="relative h-screen bg-card border-r border-border flex flex-col z-20 transition-all duration-300 ease-in-out"
         >
             {/* Header / Logo */}
-            <div className={cn("h-16 flex items-center px-6 border-b border-slate-100 dark:border-white/5", collapsed ? "justify-center px-0" : "justify-between")}>
+            <div className={cn("h-16 flex items-center px-6 border-b border-border", collapsed ? "justify-center px-0" : "justify-between")}>
                 {!collapsed ? (
                     <Logo size="sm" />
                 ) : (
@@ -58,8 +58,8 @@ export function Sidebar() {
                                 className={cn(
                                     "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative",
                                     isActive
-                                        ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
-                                        : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white"
+                                        ? "bg-primary/10 text-primary"
+                                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                                 )}
                             >
                                 <item.icon className={cn("w-5 h-5 transition-colors", isActive ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300")} />
@@ -82,10 +82,10 @@ export function Sidebar() {
             </div>
 
             {/* Footer Actions */}
-            <div className="p-4 border-t border-slate-100 dark:border-white/5 space-y-2">
+            <div className="p-4 border-t border-border space-y-2">
                 <button
                     onClick={() => setCollapsed(!collapsed)}
-                    className="w-full flex items-center justify-center p-2 rounded-xl text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                    className="w-full flex items-center justify-center p-2 rounded-xl text-muted-foreground hover:bg-muted transition-colors"
                 >
                     {collapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
                 </button>

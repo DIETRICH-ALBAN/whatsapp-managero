@@ -116,8 +116,8 @@ export default function LoginPage() {
                     </div>
 
                     <div className="mb-8">
-                        <h2 className="text-3xl font-bold text-white mb-2">Bon retour !</h2>
-                        <p className="text-slate-400">Connectez-vous pour accéder à votre dashboard</p>
+                        <h2 className="text-3xl font-bold text-foreground mb-2">Bon retour !</h2>
+                        <p className="text-muted-foreground">Connectez-vous pour accéder à votre dashboard</p>
                     </div>
 
                     {/* Error Alert */}
@@ -137,7 +137,7 @@ export default function LoginPage() {
                         onClick={handleGoogleLogin}
                         disabled={loading}
                         variant="outline"
-                        className="w-full h-12 rounded-xl border-slate-700 hover:bg-slate-800 text-white mb-6 font-medium"
+                        className="w-full h-12 rounded-xl border-input hover:bg-muted text-foreground mb-6 font-medium"
                     >
                         <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
                             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -150,17 +150,17 @@ export default function LoginPage() {
 
                     {/* Divider */}
                     <div className="flex items-center gap-4 mb-6">
-                        <div className="flex-1 h-px bg-slate-800" />
-                        <span className="text-slate-500 text-sm">ou avec email</span>
-                        <div className="flex-1 h-px bg-slate-800" />
+                        <div className="flex-1 h-px bg-border" />
+                        <span className="text-muted-foreground text-sm">ou avec email</span>
+                        <div className="flex-1 h-px bg-border" />
                     </div>
 
                     {/* Email/Password Form */}
                     <form onSubmit={handleEmailLogin} className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="email" className="text-slate-300">Email</Label>
+                            <Label htmlFor="email" className="text-foreground">Email</Label>
                             <div className="relative">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                                 <Input
                                     id="email"
                                     type="email"
@@ -168,20 +168,20 @@ export default function LoginPage() {
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
-                                    className="pl-12 h-12 bg-slate-900/50 border-slate-700 rounded-xl text-white placeholder:text-slate-500 focus:border-indigo-500"
+                                    className="pl-12 h-12 bg-background border-input rounded-xl text-foreground placeholder:text-muted-foreground focus:border-primary"
                                 />
                             </div>
                         </div>
 
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                                <Label htmlFor="password" className="text-slate-300">Mot de passe</Label>
-                                <Link href="/forgot-password" className="text-sm text-indigo-400 hover:text-indigo-300">
+                                <Label htmlFor="password" className="text-foreground">Mot de passe</Label>
+                                <Link href="/forgot-password" className="text-sm text-primary hover:text-primary/80">
                                     Oublié ?
                                 </Link>
                             </div>
                             <div className="relative">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                                 <Input
                                     id="password"
                                     type="password"
@@ -189,7 +189,7 @@ export default function LoginPage() {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
-                                    className="pl-12 h-12 bg-slate-900/50 border-slate-700 rounded-xl text-white placeholder:text-slate-500 focus:border-indigo-500"
+                                    className="pl-12 h-12 bg-background border-input rounded-xl text-foreground placeholder:text-muted-foreground focus:border-primary"
                                 />
                             </div>
                         </div>
@@ -210,9 +210,9 @@ export default function LoginPage() {
                     </form>
 
                     {/* Register Link */}
-                    <p className="mt-8 text-center text-slate-400">
+                    <p className="mt-8 text-center text-muted-foreground">
                         Pas encore de compte ?{' '}
-                        <Link href="/register" className="text-indigo-400 hover:text-indigo-300 font-medium">
+                        <Link href="/register" className="text-primary hover:text-primary/80 font-medium">
                             Créer un compte
                         </Link>
                     </p>

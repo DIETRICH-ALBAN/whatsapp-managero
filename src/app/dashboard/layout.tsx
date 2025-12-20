@@ -29,14 +29,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#fafafa] dark:bg-[#0B0B0F] flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+            <div className="min-h-screen bg-background-deep flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-primary animate-spin" />
             </div>
         )
     }
 
     return (
-        <div className="flex min-h-screen bg-[#fafafa] dark:bg-[#0B0B0F]">
+        <div className="flex min-h-screen bg-background-deep">
             <Sidebar />
             <div className="flex-1 flex flex-col min-w-0">
                 <Header user={user} />

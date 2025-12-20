@@ -83,15 +83,15 @@ export default function RegisterPage() {
                     className="w-full max-w-md text-center"
                 >
                     <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-6">
-                        <CheckCircle className="w-8 h-8 text-green-400" />
+                        <CheckCircle className="w-8 h-8 text-green-500" />
                     </div>
-                    <h2 className="text-2xl font-bold text-white mb-4">Vérifiez votre email !</h2>
-                    <p className="text-slate-400 mb-8">
-                        Nous avons envoyé un lien de confirmation à <span className="text-white font-medium">{email}</span>.
+                    <h2 className="text-2xl font-bold text-foreground mb-4">Vérifiez votre email !</h2>
+                    <p className="text-muted-foreground mb-8">
+                        Nous avons envoyé un lien de confirmation à <span className="text-foreground font-medium">{email}</span>.
                         Cliquez dessus pour activer votre compte.
                     </p>
                     <Link href="/login">
-                        <Button variant="outline" className="rounded-xl border-slate-700 text-white">
+                        <Button variant="outline" className="rounded-xl border-input text-foreground hover:bg-muted">
                             Retour à la connexion
                         </Button>
                     </Link>
@@ -104,11 +104,12 @@ export default function RegisterPage() {
         <div className="min-h-screen bg-background-deep flex">
 
             {/* Left Panel - Branding & Visual */}
-            <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700">
+            {/* Left Panel - Branding & Visual (Violet Theme) */}
+            <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-indigo-600 via-purple-600 to-violet-700">
                 {/* Decorative Elements */}
                 <div className="absolute inset-0 opacity-20 bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
                 <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
-                <div className="absolute bottom-0 left-0 w-96 h-96 bg-emerald-400/20 rounded-full blur-3xl" />
+                <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-400/20 rounded-full blur-3xl" />
 
                 <div className="relative z-10 flex flex-col justify-center px-16">
                     <motion.div
@@ -122,10 +123,10 @@ export default function RegisterPage() {
 
                         <h1 className="text-4xl md:text-5xl font-bold text-white mb-6 leading-tight">
                             Lancez votre <br />
-                            <span className="text-emerald-200">business IA</span>
+                            <span className="text-indigo-200">business IA</span>
                         </h1>
 
-                        <p className="text-lg text-emerald-100/80 max-w-md leading-relaxed">
+                        <p className="text-lg text-indigo-100/80 max-w-md leading-relaxed">
                             Rejoignez des centaines de commerçants camerounais qui automatisent leurs ventes avec notre assistant intelligent.
                         </p>
 
@@ -135,7 +136,7 @@ export default function RegisterPage() {
                                 '✓ Aucune carte bancaire requise',
                                 '✓ Support en français et pidgin'
                             ].map((item, i) => (
-                                <p key={i} className="text-emerald-100/90 font-medium">{item}</p>
+                                <p key={i} className="text-indigo-100/90 font-medium">{item}</p>
                             ))}
                         </div>
                     </motion.div>
@@ -156,8 +157,8 @@ export default function RegisterPage() {
                     </div>
 
                     <div className="mb-8">
-                        <h2 className="text-3xl font-bold text-white mb-2">Créer un compte</h2>
-                        <p className="text-slate-400">Commencez votre essai gratuit de 7 jours</p>
+                        <h2 className="text-3xl font-bold text-foreground mb-2">Créer un compte</h2>
+                        <p className="text-muted-foreground">Commencez votre essai gratuit de 7 jours</p>
                     </div>
 
                     {/* Error Alert */}
@@ -177,7 +178,7 @@ export default function RegisterPage() {
                         onClick={handleGoogleSignup}
                         disabled={loading}
                         variant="outline"
-                        className="w-full h-12 rounded-xl border-slate-700 hover:bg-slate-800 text-white mb-6 font-medium"
+                        className="w-full h-12 rounded-xl border-input hover:bg-muted text-foreground mb-6 font-medium"
                     >
                         <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
                             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -190,17 +191,17 @@ export default function RegisterPage() {
 
                     {/* Divider */}
                     <div className="flex items-center gap-4 mb-6">
-                        <div className="flex-1 h-px bg-slate-800" />
-                        <span className="text-slate-500 text-sm">ou avec email</span>
-                        <div className="flex-1 h-px bg-slate-800" />
+                        <div className="flex-1 h-px bg-border" />
+                        <span className="text-muted-foreground text-sm">ou avec email</span>
+                        <div className="flex-1 h-px bg-border" />
                     </div>
 
                     {/* Registration Form */}
                     <form onSubmit={handleRegister} className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="fullName" className="text-slate-300">Nom complet</Label>
+                            <Label htmlFor="fullName" className="text-foreground">Nom complet</Label>
                             <div className="relative">
-                                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                                 <Input
                                     id="fullName"
                                     type="text"
@@ -208,15 +209,15 @@ export default function RegisterPage() {
                                     value={fullName}
                                     onChange={(e) => setFullName(e.target.value)}
                                     required
-                                    className="pl-12 h-12 bg-slate-900/50 border-slate-700 rounded-xl text-white placeholder:text-slate-500 focus:border-emerald-500"
+                                    className="pl-12 h-12 bg-background border-input rounded-xl text-foreground placeholder:text-muted-foreground focus:border-primary"
                                 />
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="email" className="text-slate-300">Email</Label>
+                            <Label htmlFor="email" className="text-foreground">Email</Label>
                             <div className="relative">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                                 <Input
                                     id="email"
                                     type="email"
@@ -224,15 +225,15 @@ export default function RegisterPage() {
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
-                                    className="pl-12 h-12 bg-slate-900/50 border-slate-700 rounded-xl text-white placeholder:text-slate-500 focus:border-emerald-500"
+                                    className="pl-12 h-12 bg-background border-input rounded-xl text-foreground placeholder:text-muted-foreground focus:border-primary"
                                 />
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="password" className="text-slate-300">Mot de passe</Label>
+                            <Label htmlFor="password" className="text-foreground">Mot de passe</Label>
                             <div className="relative">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                                 <Input
                                     id="password"
                                     type="password"
@@ -240,7 +241,7 @@ export default function RegisterPage() {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
-                                    className="pl-12 h-12 bg-slate-900/50 border-slate-700 rounded-xl text-white placeholder:text-slate-500 focus:border-emerald-500"
+                                    className="pl-12 h-12 bg-background border-input rounded-xl text-foreground placeholder:text-muted-foreground focus:border-primary"
                                 />
                             </div>
                         </div>
@@ -248,7 +249,7 @@ export default function RegisterPage() {
                         <Button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium mt-6"
+                            className="w-full h-12 rounded-xl bg-primary hover:bg-primary/90 text-white font-medium mt-6"
                         >
                             {loading ? (
                                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -261,21 +262,21 @@ export default function RegisterPage() {
                     </form>
 
                     {/* Terms */}
-                    <p className="mt-6 text-center text-slate-500 text-sm">
+                    <p className="mt-6 text-center text-muted-foreground text-sm">
                         En vous inscrivant, vous acceptez nos{' '}
-                        <Link href="/terms" className="text-emerald-400 hover:underline">CGU</Link> et{' '}
-                        <Link href="/privacy" className="text-emerald-400 hover:underline">Politique de confidentialité</Link>
+                        <Link href="/terms" className="text-primary hover:underline">CGU</Link> et{' '}
+                        <Link href="/privacy" className="text-primary hover:underline">Politique de confidentialité</Link>
                     </p>
 
                     {/* Login Link */}
-                    <p className="mt-6 text-center text-slate-400">
+                    <p className="mt-6 text-center text-muted-foreground">
                         Déjà un compte ?{' '}
-                        <Link href="/login" className="text-emerald-400 hover:text-emerald-300 font-medium">
+                        <Link href="/login" className="text-primary hover:text-primary/80 font-medium">
                             Se connecter
                         </Link>
                     </p>
                 </motion.div>
             </div>
-        </div>
+        </div >
     )
 }
