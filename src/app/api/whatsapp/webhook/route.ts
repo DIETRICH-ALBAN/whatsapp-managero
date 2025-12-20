@@ -42,7 +42,53 @@ export async function POST(req: NextRequest) {
 
                 console.log(`📩 Nouveau message de ${name} (${from}): ${text}`)
 
-                // Sauvegarder dans Supabase
+                // 1. GESTION DE LA CONVERSATION (Upsert)
+                // On vérifie si une conversation existe déjà pour ce numéro
+                const { data: existingConvo, error: searchError } = await supabaseAdmin
+                    .from('conversations')
+                    .select('id, unread_count')
+                    .eq('contact_phone', from)
+                    .single()
+
+                let conversation_id
+
+                if (existingConvo) {
+                    // Update existante
+                    conversation_id = existingConvo.id
+                    await supabaseAdmin
+                        .from('conversations')
+                        .update({
+                            last_message: text,
+                            last_message_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString(),
+                            unread_count: (existingConvo.unread_count || 0) + 1,
+                            contact_name: name // Mise à jour du nom si changé sur WhatsApp
+                        })
+                        .eq('id', conversation_id)
+                } else {
+                    // Nouvelle conversation
+                    const { data: newConvo, error: createError } = await supabaseAdmin
+                        .from('conversations')
+                        .insert({
+                            contact_phone: from,
+                            contact_name: name,
+                            last_message: text,
+                            last_message_at: new Date().toISOString(),
+                            unread_count: 1,
+                            status: 'active'
+                        })
+                        .select()
+                        .single()
+
+                    if (createError) {
+                        console.error('Erreur création conversation:', createError)
+                        // Fallback: On continue sans ID de conversation si erreur (ne devrait pas arriver si SQL appliqué)
+                    } else {
+                        conversation_id = newConvo.id
+                    }
+                }
+
+                // 2. INSERTION DU MESSAGE
                 const { error } = await supabaseAdmin
                     .from('messages')
                     .insert({
@@ -52,7 +98,7 @@ export async function POST(req: NextRequest) {
                         direction: 'inbound',
                         status: 'new',
                         platform: 'whatsapp',
-                        // is_ai_generated: false (default)
+                        conversation_id: conversation_id // Lien avec la conversation
                     })
 
                 if (error) {
