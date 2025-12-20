@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Logo } from '@/components/ui/logo'
 import { createClient } from '@/lib/supabase'
+import { getSiteUrl } from '@/lib/utils'
 import { Mail, Lock, User, ArrowRight, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
 
 export default function RegisterPage() {
@@ -41,7 +42,7 @@ export default function RegisterPage() {
                     data: {
                         full_name: fullName,
                     },
-                    emailRedirectTo: `${window.location.origin}/auth/callback`,
+                    emailRedirectTo: `${getSiteUrl()}/auth/callback`,
                 },
             })
 
@@ -63,7 +64,7 @@ export default function RegisterPage() {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: `${window.location.origin}/auth/callback`,
+                    redirectTo: `${getSiteUrl()}/auth/callback`,
                 },
             })
 
