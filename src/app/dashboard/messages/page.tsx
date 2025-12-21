@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { createClient } from '@/lib/supabase'
 import { formatDistanceToNow } from 'date-fns'
-import { fr } from 'date-fns/locale'
+import { fr } from 'date-fns/locale/fr'
 import { cn } from '@/lib/utils'
 
 // Types (Frontend definitions matching DB)
