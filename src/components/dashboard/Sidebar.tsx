@@ -15,13 +15,15 @@ import {
     ChevronLeft,
     ChevronRight,
     LogOut,
-    HelpCircle
+    HelpCircle,
+    Smartphone
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
     { icon: Home, label: 'Vue d\'ensemble', href: '/dashboard' },
     { icon: MessageSquare, label: 'Messages', href: '/dashboard/messages' },
+    { icon: Smartphone, label: 'WhatsApp', href: '/dashboard/whatsapp' },
     { icon: ShoppingBag, label: 'Commandes', href: '/dashboard/orders' },
     { icon: FileText, label: 'Templates IA', href: '/dashboard/templates' },
     { icon: BarChart2, label: 'Analytiques', href: '/dashboard/analytics' },
