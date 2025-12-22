@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils'
 
 const navItems = [
     { icon: Home, label: 'Vue d\'ensemble', href: '/dashboard' },
-    { icon: MessageSquare, label: 'Messages', href: '/dashboard/messages' },
+    { icon: MessageSquare, label: 'CRM Messages', href: '/dashboard/messages' },
     { icon: Smartphone, label: 'WhatsApp', href: '/dashboard/whatsapp' },
     { icon: ShoppingBag, label: 'Commandes', href: '/dashboard/orders' },
     { icon: FileText, label: 'Templates IA', href: '/dashboard/templates' },
@@ -38,6 +38,7 @@ export function Sidebar() {
     // Éviter les erreurs d'hydratation (Next.js Hydration Mismatch)
     React.useEffect(() => {
         setIsMounted(true)
+        console.log('Sidebar monté. Items:', navItems) // DEBUG VIBE
     }, [])
 
     if (!isMounted) {
