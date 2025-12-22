@@ -46,7 +46,7 @@ export function Sidebar() {
         <motion.div
             initial={false}
             animate={{ width: collapsed ? 80 : 280 }}
-            className="relative h-screen bg-card border-r border-border flex flex-col z-20 transition-all duration-300 ease-in-out"
+            className="relative h-screen bg-red-900 border-r border-border flex flex-col z-20 transition-all duration-300 ease-in-out"
         >
             {/* Header / Logo */}
             <div className={cn("h-16 flex items-center px-6 border-b border-border", collapsed ? "justify-center px-0" : "justify-between")}>
