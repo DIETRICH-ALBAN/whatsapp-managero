@@ -32,10 +32,21 @@ const navItems = [
 
 export function Sidebar() {
     const [collapsed, setCollapsed] = useState(false)
+    const [isMounted, setIsMounted] = useState(false)
     const pathname = usePathname()
+
+    // Éviter les erreurs d'hydratation (Next.js Hydration Mismatch)
+    React.useEffect(() => {
+        setIsMounted(true)
+    }, [])
+
+    if (!isMounted) {
+        return <div className="h-screen w-[280px] bg-card border-r border-border" /> // Placeholder statique
+    }
 
     return (
         <motion.div
+            initial={false}
             animate={{ width: collapsed ? 80 : 280 }}
             className="relative h-screen bg-card border-r border-border flex flex-col z-20 transition-all duration-300 ease-in-out"
         >
