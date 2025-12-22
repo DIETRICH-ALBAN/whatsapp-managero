@@ -13,17 +13,13 @@ import {
     BarChart2,
     Settings,
     ChevronLeft,
-    ChevronRight,
-    LogOut,
-    HelpCircle,
-    Smartphone
+    ChevronRight
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
-    { icon: Home, label: 'Vue d\'ensemble', href: '/dashboard' },
-    { icon: MessageSquare, label: 'CRM Messages', href: '/dashboard/messages' },
-    { icon: Smartphone, label: 'WhatsApp', href: '/dashboard/whatsapp' },
+    { icon: Home, label: 'Dashboard V2', href: '/dashboard' },
+    { icon: MessageSquare, label: 'Messages', href: '/dashboard/messages' },
     { icon: ShoppingBag, label: 'Commandes', href: '/dashboard/orders' },
     { icon: FileText, label: 'Templates IA', href: '/dashboard/templates' },
     { icon: BarChart2, label: 'Analytiques', href: '/dashboard/analytics' },
@@ -38,7 +34,6 @@ export function Sidebar() {
     // Éviter les erreurs d'hydratation (Next.js Hydration Mismatch)
     React.useEffect(() => {
         setIsMounted(true)
-        console.log('Sidebar monté. Items:', navItems) // DEBUG VIBE
     }, [])
 
     if (!isMounted) {
