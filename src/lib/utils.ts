@@ -6,11 +6,16 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getSiteUrl() {
+  // En priorité, utiliser l'URL définie en variable d'environnement
   if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL
+    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '')
   }
-  if (typeof window !== 'undefined') {
+
+  // Sinon, utiliser l'URL actuelle du navigateur (client-side)
+  if (typeof window !== 'undefined' && window.location.origin) {
     return window.location.origin
   }
+
+  // En dernier recours, localhost
   return 'http://localhost:3000'
 }
