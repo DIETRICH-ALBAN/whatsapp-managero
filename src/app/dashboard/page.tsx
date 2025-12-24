@@ -113,6 +113,10 @@ export default function DashboardPage() {
 
     return (
         <div className="space-y-8">
+            {/* Bannière de Test de Déploiement */}
+            <div className="bg-indigo-600/10 border border-indigo-500/20 p-4 rounded-xl mb-6">
+                <p className="text-indigo-400 font-bold text-center italic">🚀 VIBE VERSION 2.1 - PIPELINE DE DÉPLOIEMENT VALIDÉ</p>
+            </div>
             {/* Intro */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>

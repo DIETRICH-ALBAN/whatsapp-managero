@@ -13,15 +13,13 @@ import {
     BarChart2,
     Settings,
     ChevronLeft,
-    ChevronRight,
-    Smartphone
+    ChevronRight
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
-    { icon: Home, label: 'Dashboard V2', href: '/dashboard' },
+    { icon: Home, label: 'Vue d\'ensemble', href: '/dashboard' },
     { icon: MessageSquare, label: 'Messages', href: '/dashboard/messages' },
-    { icon: Smartphone, label: 'Connect WhatsApp', href: '/dashboard/whatsapp' },
     { icon: ShoppingBag, label: 'Commandes', href: '/dashboard/orders' },
     { icon: FileText, label: 'Templates IA', href: '/dashboard/templates' },
     { icon: BarChart2, label: 'Analytiques', href: '/dashboard/analytics' },
@@ -33,20 +31,19 @@ export function Sidebar() {
     const [isMounted, setIsMounted] = useState(false)
     const pathname = usePathname()
 
-    // Éviter les erreurs d'hydratation (Next.js Hydration Mismatch)
     React.useEffect(() => {
         setIsMounted(true)
     }, [])
 
     if (!isMounted) {
-        return <div className="h-screen w-[280px] bg-card border-r border-border" /> // Placeholder statique
+        return <div className="h-screen w-[280px] bg-card border-r border-border" />
     }
 
     return (
         <motion.div
             initial={false}
             animate={{ width: collapsed ? 80 : 280 }}
-            className="relative h-screen bg-red-900 border-r border-border flex flex-col z-20 transition-all duration-300 ease-in-out"
+            className="relative h-screen bg-card border-r border-border flex flex-col z-20 transition-all duration-300 ease-in-out"
         >
             {/* Header / Logo */}
             <div className={cn("h-16 flex items-center px-6 border-b border-border", collapsed ? "justify-center px-0" : "justify-between")}>
@@ -79,7 +76,6 @@ export function Sidebar() {
                                     <span className="font-medium text-sm">{item.label}</span>
                                 )}
 
-                                {/* Active Indicator Line */}
                                 {isActive && !collapsed && (
                                     <motion.div
                                         layoutId="active-indicator"
