@@ -1,7 +1,5 @@
 /**
- * VIBE Agent - WhatsApp Service
- * Microservice autonome pour gérer les connexions WhatsApp via Baileys (Format ESM)
- * Déployable sur Railway, Render, ou tout VPS
+ * VIBE Agent - WhatsApp Service (ESM)
  */
 
 import 'dotenv/config'
@@ -20,37 +18,42 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-// Configuration de __dirname pour ESM
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Configuration
+// --- CONFIGURATION ---
+// Railway injecte souvent PORT. Si on a mis 3000 dans l'UI, on force 3000.
 const PORT = process.env.PORT || 3000
-const HOST = '0.0.0.0' // Important pour Railway
+const HOST = '0.0.0.0'
+
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
-const API_SECRET = process.env.API_SECRET || 'dev-secret'
+const API_SECRET = process.env.API_SECRET || 'vibe_vendor_secure_2024'
 
-// Validation
+console.log('--- DÉMARRAGE DU SERVICE ---')
+console.log(`Port: ${PORT}`)
+console.log(`Supabase URL présente: ${!!SUPABASE_URL}`)
+console.log(`Supabase Key présente: ${!!SUPABASE_SERVICE_KEY}`)
+
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-    console.error('❌ Variables SUPABASE_URL et SUPABASE_SERVICE_KEY requises')
-    process.exit(1)
+    console.error('❌ ERREUR: SUPABASE_URL ou SUPABASE_SERVICE_KEY manquante dans Railway !')
+    // On ne fait pas exit(1) tout de suite pour laisser les logs apparaître
 }
 
-// Clients
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+const supabase = (SUPABASE_URL && SUPABASE_SERVICE_KEY)
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    : null
+
 const logger = pino({ level: 'info' })
 const app = express()
 
 app.use(cors())
 app.use(express.json())
 
-// Store en mémoire pour les sessions actives
 const activeSockets = new Map()
 const qrCodes = new Map()
 const connectionStatus = new Map()
 
-// Middleware d'authentification simple
 const authMiddleware = (req, res, next) => {
     const authHeader = req.headers['x-api-secret']
     if (authHeader !== API_SECRET) {
@@ -59,245 +62,80 @@ const authMiddleware = (req, res, next) => {
     next()
 }
 
-// Créer le dossier pour les sessions si nécessaire
 const sessionsDir = path.join(__dirname, 'sessions')
-if (!fs.existsSync(sessionsDir)) {
-    fs.mkdirSync(sessionsDir, { recursive: true })
-}
+if (!fs.existsSync(sessionsDir)) fs.mkdirSync(sessionsDir, { recursive: true })
 
-/**
- * Démarre une connexion WhatsApp pour un utilisateur
- */
+// Démarrage session
 async function startWhatsAppSession(userId) {
     try {
-        // Vérifier si déjà connecté
+        if (!supabase) throw new Error('Supabase non configuré')
+
         const existingSocket = activeSockets.get(userId)
         if (existingSocket?.user) {
-            return {
-                status: 'connected',
-                phoneNumber: existingSocket.user.id.split(':')[0]
-            }
-        }
-
-        // Si en cours de connexion, retourner le QR existant
-        if (connectionStatus.get(userId) === 'connecting' && qrCodes.has(userId)) {
-            return {
-                status: 'connecting',
-                qrCode: qrCodes.get(userId)
-            }
+            return { status: 'connected', phoneNumber: existingSocket.user.id.split(':')[0] }
         }
 
         connectionStatus.set(userId, 'connecting')
-        logger.info({ userId }, 'Démarrage session WhatsApp')
-
-        // Charger l'état d'authentification
         const sessionPath = path.join(sessionsDir, userId)
         const { state, saveCreds } = await useMultiFileAuthState(sessionPath)
         const { version } = await fetchLatestBaileysVersion()
 
-        // Créer le socket WhatsApp
         const socket = makeWASocket({
             version,
             auth: state,
-            printQRInTerminal: true,
             logger: pino({ level: 'silent' }),
             browser: ['VIBE Agent', 'Chrome', '120.0.0']
         })
 
         activeSockets.set(userId, socket)
 
-        // Gérer les événements de connexion
         socket.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update
-
             if (qr) {
-                const qrDataUrl = await QRCode.toDataURL(qr)
-                qrCodes.set(userId, qrDataUrl)
-                logger.info({ userId }, 'QR code généré')
+                qrCodes.set(userId, await QRCode.toDataURL(qr))
             }
-
-            if (connection === 'close') {
-                const statusCode = (lastDisconnect?.error instanceof Boom)
-                    ? lastDisconnect.error.output?.statusCode
-                    : lastDisconnect?.error?.output?.statusCode
-
-                const shouldReconnect = statusCode !== DisconnectReason.loggedOut
-
-                logger.info({ userId, statusCode, shouldReconnect }, 'Connexion fermée')
-
-                connectionStatus.set(userId, 'disconnected')
+            if (connection === 'open') {
+                connectionStatus.set(userId, 'connected')
                 qrCodes.delete(userId)
-                activeSockets.delete(userId)
-
-                // Mettre à jour Supabase
-                await supabase
-                    .from('whatsapp_sessions')
-                    .update({ is_connected: false })
-                    .eq('user_id', userId)
-
-                if (shouldReconnect) {
+                await supabase.from('whatsapp_sessions').upsert({
+                    user_id: userId,
+                    phone_number: socket.user?.id.split(':')[0],
+                    is_connected: true,
+                    last_connected_at: new Date().toISOString()
+                }, { onConflict: 'user_id' })
+            }
+            if (connection === 'close') {
+                const statusCode = lastDisconnect?.error?.output?.statusCode
+                if (statusCode !== DisconnectReason.loggedOut) {
                     setTimeout(() => startWhatsAppSession(userId), 5000)
                 }
             }
-
-            if (connection === 'open') {
-                logger.info({ userId }, 'Connexion établie !')
-                connectionStatus.set(userId, 'connected')
-                qrCodes.delete(userId)
-
-                const phoneNumber = socket.user?.id.split(':')[0] || null
-
-                // Sauvegarder dans Supabase
-                await supabase
-                    .from('whatsapp_sessions')
-                    .upsert({
-                        user_id: userId,
-                        phone_number: phoneNumber,
-                        is_connected: true,
-                        last_connected_at: new Date().toISOString()
-                    }, { onConflict: 'user_id' })
-            }
         })
 
-        // Sauvegarder les credentials quand ils changent
         socket.ev.on('creds.update', saveCreds)
-
-        // Gérer les messages entrants
-        socket.ev.on('messages.upsert', async (m) => {
-            const msg = m.messages[0]
-            if (!msg.key.fromMe && m.type === 'notify') {
-                const senderPhone = (msg.key.remoteJid || '').split('@')[0] || ''
-                const messageContent = msg.message?.conversation ||
-                    msg.message?.extendedTextMessage?.text ||
-                    '[Media]'
-
-                logger.info({ userId, from: senderPhone, content: messageContent }, 'Message reçu')
-
-                // Stocker le message dans Supabase (optionnel ici, l'app principale peut aussi le faire)
-                try {
-                    await supabase.from('messages').insert({
-                        user_id: userId,
-                        contact_phone: senderPhone,
-                        content: messageContent,
-                        direction: 'inbound',
-                        status: 'received',
-                        platform: 'whatsapp'
-                    })
-                } catch (e) {
-                    logger.error({ error: e.message }, 'Erreur backup message Supabase')
-                }
-            }
-        })
-
-        // Attendre la génération du QR
-        await new Promise(resolve => setTimeout(resolve, 3000))
+        await new Promise(r => setTimeout(r, 3000))
 
         return {
             status: 'connecting',
             qrCode: qrCodes.get(userId),
-            message: qrCodes.has(userId) ? 'Scannez le QR code' : 'Génération en cours...'
+            message: qrCodes.has(userId) ? 'Scannez le QR' : 'Génération...'
         }
-
     } catch (error) {
-        logger.error({ userId, error: error.message }, 'Erreur démarrage session')
-        connectionStatus.set(userId, 'disconnected')
         return { status: 'error', message: error.message }
     }
 }
 
-// ============ ROUTES API ============
-
-// Health check
-app.get('/', (req, res) => {
-    res.json({
-        service: 'VIBE WhatsApp Service',
-        status: 'running',
-        activeSessions: activeSockets.size
-    })
-})
-
-// Démarrer une connexion
-app.post('/connect/:userId', authMiddleware, async (req, res) => {
-    const { userId } = req.params
-    const result = await startWhatsAppSession(userId)
-    res.json(result)
-})
-
-// Récupérer le statut
+// Routes
+app.get('/', (req, res) => res.json({ status: 'online', port: PORT }))
+app.post('/connect/:userId', authMiddleware, async (req, res) => res.json(await startWhatsAppSession(req.params.userId)))
 app.get('/status/:userId', authMiddleware, (req, res) => {
-    const { userId } = req.params
-    const status = connectionStatus.get(userId) || 'disconnected'
-    const qrCode = qrCodes.get(userId)
-    const socket = activeSockets.get(userId)
-
     res.json({
-        status,
-        qrCode: status === 'connecting' ? qrCode : undefined,
-        phoneNumber: socket?.user?.id.split(':')[0]
+        status: connectionStatus.get(req.params.userId) || 'disconnected',
+        qrCode: qrCodes.get(req.params.userId),
+        phoneNumber: activeSockets.get(req.params.userId)?.user?.id.split(':')[0]
     })
 })
 
-// Déconnecter
-app.delete('/disconnect/:userId', authMiddleware, async (req, res) => {
-    const { userId } = req.params
-    const socket = activeSockets.get(userId)
-
-    if (socket) {
-        try {
-            await socket.logout()
-        } catch (e) {
-            logger.warn({ userId, error: e.message }, 'Erreur logout')
-        }
-        activeSockets.delete(userId)
-    }
-
-    qrCodes.delete(userId)
-    connectionStatus.set(userId, 'disconnected')
-
-    await supabase
-        .from('whatsapp_sessions')
-        .update({ is_connected: false })
-        .eq('user_id', userId)
-
-    res.json({ success: true })
-})
-
-// Envoyer un message
-app.post('/send/:userId', authMiddleware, async (req, res) => {
-    const { userId } = req.params
-    const { phoneNumber, message } = req.body
-
-    const socket = activeSockets.get(userId)
-    if (!socket || connectionStatus.get(userId) !== 'connected') {
-        return res.status(400).json({ error: 'WhatsApp non connecté' })
-    }
-
-    try {
-        const jid = `${phoneNumber}@s.whatsapp.net`
-        await socket.sendMessage(jid, { text: message })
-
-        // Stocker le message sortant
-        try {
-            await supabase.from('messages').insert({
-                user_id: userId,
-                contact_phone: phoneNumber,
-                content: message,
-                direction: 'outbound',
-                status: 'sent',
-                platform: 'whatsapp'
-            })
-        } catch (e) {
-            logger.error({ error: e.message }, 'Erreur backup message Supabase')
-        }
-
-        res.json({ success: true })
-    } catch (error) {
-        logger.error({ userId, error: error.message }, 'Erreur envoi message')
-        res.status(500).json({ error: 'Erreur envoi' })
-    }
-})
-
-// Démarrer le serveur
 app.listen(PORT, HOST, () => {
-    logger.info({ port: PORT, host: HOST }, '🚀 WhatsApp Service démarré')
+    console.log(`🚀 SERVEUR PRÊT SUR http://${HOST}:${PORT}`)
 })
