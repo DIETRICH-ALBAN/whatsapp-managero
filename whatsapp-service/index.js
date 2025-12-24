@@ -1,20 +1,28 @@
 /**
  * VIBE Agent - WhatsApp Service
- * Microservice autonome pour gérer les connexions WhatsApp via Baileys
+ * Microservice autonome pour gérer les connexions WhatsApp via Baileys (Format ESM)
  * Déployable sur Railway, Render, ou tout VPS
  */
 
-require('dotenv').config()
-const express = require('express')
-const cors = require('cors')
-const makeWASocket = require('@whiskeysockets/baileys').default
-const { DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys')
-const { Boom } = require('@hapi/boom')
-const QRCode = require('qrcode')
-const { createClient } = require('@supabase/supabase-js')
-const pino = require('pino')
-const fs = require('fs')
-const path = require('path')
+import 'dotenv/config'
+import express from 'express'
+import cors from 'cors'
+import makeWASocket, {
+    DisconnectReason,
+    useMultiFileAuthState,
+    fetchLatestBaileysVersion
+} from '@whiskeysockets/baileys'
+import { Boom } from '@hapi/boom'
+import QRCode from 'qrcode'
+import { createClient } from '@supabase/supabase-js'
+import pino from 'pino'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+// Configuration de __dirname pour ESM
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 // Configuration
 const PORT = process.env.PORT || 3001
@@ -84,9 +92,11 @@ async function startWhatsAppSession(userId) {
         // Charger l'état d'authentification
         const sessionPath = path.join(sessionsDir, userId)
         const { state, saveCreds } = await useMultiFileAuthState(sessionPath)
+        const { version } = await fetchLatestBaileysVersion()
 
         // Créer le socket WhatsApp
         const socket = makeWASocket({
+            version,
             auth: state,
             printQRInTerminal: true,
             logger: pino({ level: 'silent' }),
@@ -106,7 +116,10 @@ async function startWhatsAppSession(userId) {
             }
 
             if (connection === 'close') {
-                const statusCode = (lastDisconnect?.error)?.output?.statusCode
+                const statusCode = (lastDisconnect?.error instanceof Boom)
+                    ? lastDisconnect.error.output?.statusCode
+                    : lastDisconnect?.error?.output?.statusCode
+
                 const shouldReconnect = statusCode !== DisconnectReason.loggedOut
 
                 logger.info({ userId, statusCode, shouldReconnect }, 'Connexion fermée')
@@ -152,24 +165,26 @@ async function startWhatsAppSession(userId) {
         socket.ev.on('messages.upsert', async (m) => {
             const msg = m.messages[0]
             if (!msg.key.fromMe && m.type === 'notify') {
-                const senderPhone = msg.key.remoteJid?.split('@')[0] || ''
+                const senderPhone = (msg.key.remoteJid || '').split('@')[0] || ''
                 const messageContent = msg.message?.conversation ||
                     msg.message?.extendedTextMessage?.text ||
                     '[Media]'
 
                 logger.info({ userId, from: senderPhone, content: messageContent }, 'Message reçu')
 
-                // Stocker le message dans Supabase
-                await supabase.from('messages').insert({
-                    user_id: userId,
-                    contact_phone: senderPhone,
-                    content: messageContent,
-                    direction: 'inbound',
-                    status: 'received',
-                    platform: 'whatsapp'
-                })
-
-                // TODO: Appeler l'IA pour générer une réponse
+                // Stocker le message dans Supabase (optionnel ici, l'app principale peut aussi le faire)
+                try {
+                    await supabase.from('messages').insert({
+                        user_id: userId,
+                        contact_phone: senderPhone,
+                        content: messageContent,
+                        direction: 'inbound',
+                        status: 'received',
+                        platform: 'whatsapp'
+                    })
+                } catch (e) {
+                    logger.error({ error: e.message }, 'Erreur backup message Supabase')
+                }
             }
         })
 
@@ -261,14 +276,18 @@ app.post('/send/:userId', authMiddleware, async (req, res) => {
         await socket.sendMessage(jid, { text: message })
 
         // Stocker le message sortant
-        await supabase.from('messages').insert({
-            user_id: userId,
-            contact_phone: phoneNumber,
-            content: message,
-            direction: 'outbound',
-            status: 'sent',
-            platform: 'whatsapp'
-        })
+        try {
+            await supabase.from('messages').insert({
+                user_id: userId,
+                contact_phone: phoneNumber,
+                content: message,
+                direction: 'outbound',
+                status: 'sent',
+                platform: 'whatsapp'
+            })
+        } catch (e) {
+            logger.error({ error: e.message }, 'Erreur backup message Supabase')
+        }
 
         res.json({ success: true })
     } catch (error) {

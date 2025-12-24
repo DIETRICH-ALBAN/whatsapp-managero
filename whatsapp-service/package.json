@@ -1,6 +1,7 @@
 {
     "name": "whatsapp-service",
     "version": "1.0.0",
+    "type": "module",
     "description": "Microservice WhatsApp Baileys pour VIBE Agent",
     "main": "index.js",
     "scripts": {
