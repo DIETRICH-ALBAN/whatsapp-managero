@@ -25,7 +25,8 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // Configuration
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT || 3000
+const HOST = '0.0.0.0' // Important pour Railway
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
 const API_SECRET = process.env.API_SECRET || 'dev-secret'
@@ -297,6 +298,6 @@ app.post('/send/:userId', authMiddleware, async (req, res) => {
 })
 
 // Démarrer le serveur
-app.listen(PORT, () => {
-    logger.info({ port: PORT }, '🚀 WhatsApp Service démarré')
+app.listen(PORT, HOST, () => {
+    logger.info({ port: PORT, host: HOST }, '🚀 WhatsApp Service démarré')
 })
