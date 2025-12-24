@@ -109,7 +109,19 @@ async function startSession(userId) {
         })
 
         socket.ev.on('creds.update', saveCreds)
-        return { status: 'connecting', qrCode: qrCodes.get(userId) }
+
+        console.log(`[WhatsApp] Session initiée pour ${userId}, attente de la génération du QR...`)
+        // Attendre que Baileys génère le QR code
+        await new Promise(r => setTimeout(r, 10000))
+
+        const qrCode = qrCodes.get(userId)
+        console.log(`[WhatsApp] Résultat QR pour ${userId}: ${qrCode ? 'Généré' : 'Non généré'}`)
+
+        return {
+            status: 'connecting',
+            qrCode: qrCode || null,
+            message: qrCode ? 'Scannez le QR' : 'Génération en cours, le QR apparaîtra au prochain rafraîchissement automatique.'
+        }
     } catch (e) {
         return { status: 'error', message: e.message }
     }
