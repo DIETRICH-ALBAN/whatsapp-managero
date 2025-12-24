@@ -13,12 +13,14 @@ import {
     BarChart2,
     Settings,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Smartphone
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
     { icon: Home, label: 'Vue d\'ensemble', href: '/dashboard' },
+    { icon: Smartphone, label: 'WhatsApp', href: '/dashboard/whatsapp' },
     { icon: MessageSquare, label: 'Messages', href: '/dashboard/messages' },
     { icon: ShoppingBag, label: 'Commandes', href: '/dashboard/orders' },
     { icon: FileText, label: 'Templates IA', href: '/dashboard/templates' },
