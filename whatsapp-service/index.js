@@ -118,6 +118,71 @@ async function startSession(userId) {
         })
 
         socket.ev.on('creds.update', saveCreds)
+
+        // === ÉCOUTE DES MESSAGES ENTRANTS ===
+        socket.ev.on('messages.upsert', async (m) => {
+            const messages = m.messages
+            for (const msg of messages) {
+                // Ignorer les messages de statut et les messages envoyés par nous
+                if (msg.key.fromMe || msg.key.remoteJid === 'status@broadcast') continue
+
+                const senderNumber = msg.key.remoteJid.split('@')[0]
+                const messageContent = msg.message?.conversation ||
+                    msg.message?.extendedTextMessage?.text ||
+                    '[Média non supporté]'
+
+                console.log(`[Message] Nouveau de ${senderNumber}: ${messageContent.substring(0, 50)}...`)
+
+                try {
+                    // 1. Trouver ou créer la conversation
+                    let { data: conversation } = await supabase
+                        .from('conversations')
+                        .select('id')
+                        .eq('user_id', userId)
+                        .eq('contact_phone', senderNumber)
+                        .single()
+
+                    if (!conversation) {
+                        const { data: newConvo } = await supabase
+                            .from('conversations')
+                            .insert({
+                                user_id: userId,
+                                contact_phone: senderNumber,
+                                contact_name: senderNumber,
+                                last_message: messageContent,
+                                unread_count: 1
+                            })
+                            .select('id')
+                            .single()
+                        conversation = newConvo
+                    } else {
+                        // Mettre à jour la conversation existante
+                        await supabase
+                            .from('conversations')
+                            .update({
+                                last_message: messageContent,
+                                last_message_at: new Date().toISOString(),
+                                unread_count: supabase.sql`unread_count + 1`
+                            })
+                            .eq('id', conversation.id)
+                    }
+
+                    // 2. Enregistrer le message
+                    await supabase.from('messages').insert({
+                        conversation_id: conversation.id,
+                        contact_phone: senderNumber,
+                        content: messageContent,
+                        direction: 'inbound',
+                        status: 'received'
+                    })
+
+                    console.log(`[Message] Enregistré dans conversation ${conversation.id}`)
+                } catch (dbError) {
+                    console.error(`[Message] Erreur DB:`, dbError.message)
+                }
+            }
+        })
+
         return { status: 'connecting' }
     } catch (e) {
         console.error(`[CRASH] ${userId}:`, e.message)
