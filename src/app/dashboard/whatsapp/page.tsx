@@ -77,7 +77,10 @@ export default function WhatsAppPage() {
             const data = await res.json()
 
             if (data.error) {
-                toast.error('Erreur', { description: data.error })
+                toast.error('Erreur', {
+                    description: data.details || data.error,
+                    duration: 5000
+                })
                 return
             }
 
@@ -121,8 +124,8 @@ export default function WhatsAppPage() {
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
                         <div className={`p-3 rounded-xl ${state.status === 'connected' ? 'bg-emerald-500/10' :
-                                state.status === 'connecting' ? 'bg-amber-500/10' :
-                                    'bg-slate-500/10'
+                            state.status === 'connecting' ? 'bg-amber-500/10' :
+                                'bg-slate-500/10'
                             }`}>
                             {state.status === 'connected' ?
                                 <Wifi className="w-6 h-6 text-emerald-500" /> :
