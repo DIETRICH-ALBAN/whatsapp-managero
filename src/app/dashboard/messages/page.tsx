@@ -162,34 +162,37 @@ export default function MessagesPage() {
             conversation_id: selectedConvoId
         }
         setMessages(prev => [...prev, optimisticMsg])
+        const messageToSend = inputText
         setInputText('')
         scrollToBottom()
 
-        // 2. Send to Backend (API)
-        // Note: For MVP we just insert to DB, but ideally we call an API that calls WhatsApp Cloud API
+        // 2. Appel API pour envoyer via WhatsApp
         try {
-            // TODO: Call API /api/whatsapp/send
-            // For now, manual insert to simulate sent message
-            const { error } = await supabase.from('messages').insert({
-                conversation_id: selectedConvoId,
-                contact_phone: currentConvo.contact_phone,
-                content: optimisticMsg.content,
-                direction: 'outbound',
-                status: 'sent'
+            const response = await fetch('/api/whatsapp/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    phoneNumber: currentConvo.contact_phone,
+                    message: messageToSend,
+                    conversationId: selectedConvoId
+                })
             })
 
-            if (error) throw error
+            const result = await response.json()
 
-            // Update conversation last message
-            await supabase.from('conversations').update({
-                last_message: optimisticMsg.content,
-                last_message_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            }).eq('id', selectedConvoId)
+            if (!response.ok) {
+                console.error('Erreur envoi:', result.error)
+                // Marquer le message comme échoué
+                setMessages(prev => prev.map(m =>
+                    m.id === optimisticMsg.id ? { ...m, status: 'failed' } : m
+                ))
+            }
 
         } catch (err) {
             console.error('Failed to send message:', err)
-            // Rollback optimistic update if needed
+            setMessages(prev => prev.map(m =>
+                m.id === optimisticMsg.id ? { ...m, status: 'failed' } : m
+            ))
         }
     }
 
