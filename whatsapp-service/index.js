@@ -208,4 +208,28 @@ app.delete('/disconnect/:userId', authMiddleware, async (req, res) => {
     res.json({ success: true })
 })
 
+// === ENVOI DE MESSAGES ===
+app.post('/send/:userId', authMiddleware, async (req, res) => {
+    const { userId } = req.params
+    const { phoneNumber, message } = req.body
+
+    const socket = activeSockets.get(userId)
+    if (!socket) {
+        return res.status(400).json({ error: 'WhatsApp non connecté' })
+    }
+
+    try {
+        // Formater le numéro au format WhatsApp (ajouter @s.whatsapp.net)
+        const jid = phoneNumber.includes('@') ? phoneNumber : `${phoneNumber}@s.whatsapp.net`
+
+        await socket.sendMessage(jid, { text: message })
+        console.log(`[Envoi] Message envoyé à ${phoneNumber}`)
+
+        res.json({ success: true, message: 'Message envoyé' })
+    } catch (error) {
+        console.error(`[Envoi] Erreur:`, error.message)
+        res.status(500).json({ error: 'Échec envoi', details: error.message })
+    }
+})
+
 app.listen(PORT, HOST, () => console.log(`🚀 Microservice prêt sur ${PORT}`))
