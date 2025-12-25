@@ -1,17 +1,16 @@
 /**
- * VIBE Agent - WhatsApp Service (Stable)
+ * VIBE Agent - WhatsApp Service (Stable ESM)
  */
 
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
-import pkgBaileys from '@whiskeysockets/baileys'
-const {
-    default: makeWASocket,
-    DisconnectReason,
+// Importation directe des fonctions pour éviter l'erreur "not a function"
+import makeWASocket, {
     useMultiFileAuthState,
+    DisconnectReason,
     fetchLatestBaileysVersion
-} = pkgBaileys
+} from '@whiskeysockets/baileys'
 
 import { Boom } from '@hapi/boom'
 import QRCode from 'qrcode'
@@ -24,7 +23,6 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// ON FORCE LE PORT 3000 POUR CORRESPONDRE AU NETWORKING RAILWAY
 const PORT = 3000
 const HOST = '0.0.0.0'
 
@@ -36,7 +34,6 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
-// Log de chaque requête pour debugger
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`)
     next()
@@ -47,43 +44,43 @@ const qrCodes = new Map()
 const connectionStatus = new Map()
 
 const authMiddleware = (req, res, next) => {
-    const secret = req.headers['x-api-secret']
-    if (secret !== API_SECRET) {
-        console.warn(`[Auth] Tentative échouée avec secret: ${secret}`)
+    if (req.headers['x-api-secret'] !== API_SECRET) {
         return res.status(401).json({ error: 'Non autorisé' })
     }
     next()
 }
 
-app.get('/', (req, res) => res.json({ status: 'online', port: PORT }))
+app.get('/', (req, res) => res.json({ status: 'online', service: 'VIBE WhatsApp' }))
 
 async function startSession(userId) {
-    if (activeSockets.has(userId)) {
-        return { status: connectionStatus.get(userId) || 'connecting' }
-    }
+    if (activeSockets.has(userId)) return { status: connectionStatus.get(userId) || 'connecting' }
 
     try {
-        console.log(`[Session] Démarrage processus pour ${userId}`)
+        console.log(`[Session] Démarrage pour ${userId}`)
         const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-        const sessionPath = path.join(__dirname, 'sessions', userId)
-        console.log(`[Session] Chemin : ${sessionPath}`)
+        const sessionDir = path.join(__dirname, 'sessions')
+        if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true })
 
-        if (!fs.existsSync(path.join(__dirname, 'sessions'))) {
-            fs.mkdirSync(path.join(__dirname, 'sessions'), { recursive: true })
-            console.log(`[Session] Dossier sessions créé`)
+        const sessionPath = path.join(sessionDir, userId)
+
+        // --- FIX CRITIQUE ---
+        // On vérifie que la fonction existe bien avant de l'appeler
+        if (typeof useMultiFileAuthState !== 'function') {
+            throw new Error("Erreur d'importation Baileys: useMultiFileAuthState n'est pas une fonction");
         }
 
         const { state, saveCreds } = await useMultiFileAuthState(sessionPath)
-        console.log(`[Session] Auth state chargé`)
-
         const { version } = await fetchLatestBaileysVersion()
-        console.log(`[Session] Baileys version : ${version}`)
 
-        const socket = makeWASocket({
+        const socket = makeWASocket.default ? makeWASocket.default({
             version,
             auth: state,
-            printQRInTerminal: false,
+            browser: ['VIBE Agent', 'Chrome', '120.0.0'],
+            logger: pino({ level: 'silent' })
+        }) : makeWASocket({
+            version,
+            auth: state,
             browser: ['VIBE Agent', 'Chrome', '120.0.0'],
             logger: pino({ level: 'silent' })
         })
@@ -94,12 +91,12 @@ async function startSession(userId) {
         socket.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update
             if (qr) {
-                console.log(`[QR] Nouveau code généré pour ${userId}`)
+                console.log(`[QR] Nouveau code pour ${userId}`)
                 qrCodes.set(userId, await QRCode.toDataURL(qr))
             }
 
             if (connection === 'open') {
-                console.log(`[Connexion] WhatsApp prêt pour ${userId}`)
+                console.log(`[Connexion] Succès pour ${userId}`)
                 connectionStatus.set(userId, 'connected')
                 qrCodes.delete(userId)
                 await supabase.from('whatsapp_sessions').upsert({
@@ -111,7 +108,6 @@ async function startSession(userId) {
             }
 
             if (connection === 'close') {
-                console.log(`[Déconnexion] Session close pour ${userId}`)
                 activeSockets.delete(userId)
                 connectionStatus.set(userId, 'disconnected')
                 const shouldReconnect = (lastDisconnect?.error instanceof Boom)
@@ -124,13 +120,12 @@ async function startSession(userId) {
         socket.ev.on('creds.update', saveCreds)
         return { status: 'connecting' }
     } catch (e) {
-        console.error(`[Erreur] Session ${userId}:`, e.message)
+        console.error(`[CRASH] ${userId}:`, e.message)
         return { status: 'error', message: e.message }
     }
 }
 
 app.post('/connect/:userId', authMiddleware, async (req, res) => res.json(await startSession(req.params.userId)))
-
 app.get('/status/:userId', authMiddleware, (req, res) => {
     res.json({
         status: connectionStatus.get(req.params.userId) || 'disconnected',
@@ -138,14 +133,14 @@ app.get('/status/:userId', authMiddleware, (req, res) => {
         phoneNumber: activeSockets.get(req.params.userId)?.user?.id.split(':')[0]
     })
 })
-
 app.delete('/disconnect/:userId', authMiddleware, async (req, res) => {
     const socket = activeSockets.get(req.params.userId)
     if (socket) {
         try { await socket.logout() } catch (e) { }
         activeSockets.delete(req.params.userId)
+        connectionStatus.set(req.params.userId, 'disconnected')
     }
     res.json({ success: true })
 })
 
-app.listen(PORT, HOST, () => console.log(`🚀 SERVEUR FORCÉ SUR PORT ${PORT}`))
+app.listen(PORT, HOST, () => console.log(`🚀 Microservice prêt sur ${PORT}`))
