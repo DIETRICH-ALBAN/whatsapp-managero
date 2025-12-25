@@ -1,5 +1,5 @@
 /**
- * VIBE Agent - WhatsApp Service (Stable ESM)
+ * VIBE Agent - WhatsApp Service (Optimisé)
  */
 
 import 'dotenv/config'
@@ -24,28 +24,21 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// --- CONFIGURATION STRICTE ---
-// On force 3000 car c'est ce qui est configuré dans votre interface Railway "Custom Port"
-const PORT = 3000
+const PORT = process.env.PORT || 3000
 const HOST = '0.0.0.0'
 
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
 const API_SECRET = process.env.API_SECRET || 'vibe_vendor_secure_2024'
 
-console.log('--- INITIALISATION VIBE WHATSAPP ---')
-console.log(`Port cible: ${PORT}`)
-
 const app = express()
 app.use(cors())
 app.use(express.json())
 
-// Store
 const activeSockets = new Map()
 const qrCodes = new Map()
 const connectionStatus = new Map()
 
-// Auth simple
 const authMiddleware = (req, res, next) => {
     if (req.headers['x-api-secret'] !== API_SECRET) {
         return res.status(401).json({ error: 'Non autorisé' })
@@ -53,21 +46,13 @@ const authMiddleware = (req, res, next) => {
     next()
 }
 
-// Route de test (Doit répondre à https://vibevendor.up.railway.app/)
-app.get('/', (req, res) => {
-    res.json({
-        status: 'online',
-        message: 'WhatsApp Service is ready',
-        timestamp: new Date().toISOString()
-    })
-})
+app.get('/', (req, res) => res.json({ status: 'online', service: 'VIBE WhatsApp' }))
 
-// Logique WhatsApp
 async function startSession(userId) {
-    try {
-        if (!SUPABASE_URL) throw new Error('Variable SUPABASE_URL manquante')
-        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    if (activeSockets.has(userId)) return { status: connectionStatus.get(userId) || 'connecting' }
 
+    try {
+        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
         const sessionPath = path.join(__dirname, 'sessions', userId)
         if (!fs.existsSync(path.join(__dirname, 'sessions'))) fs.mkdirSync(path.join(__dirname, 'sessions'))
 
@@ -101,42 +86,41 @@ async function startSession(userId) {
             }
 
             if (connection === 'close') {
+                activeSockets.delete(userId)
+                connectionStatus.set(userId, 'disconnected')
                 const shouldReconnect = (lastDisconnect?.error instanceof Boom)
                     ? lastDisconnect.error.output?.statusCode !== DisconnectReason.loggedOut
                     : true
-                if (shouldReconnect) startSession(userId)
+                if (shouldReconnect) setTimeout(() => startSession(userId), 5000)
             }
         })
 
         socket.ev.on('creds.update', saveCreds)
 
-        console.log(`[WhatsApp] Session initiée pour ${userId}, attente de la génération du QR...`)
-        // Attendre que Baileys génère le QR code
-        await new Promise(r => setTimeout(r, 10000))
-
-        const qrCode = qrCodes.get(userId)
-        console.log(`[WhatsApp] Résultat QR pour ${userId}: ${qrCode ? 'Généré' : 'Non généré'}`)
-
-        return {
-            status: 'connecting',
-            qrCode: qrCode || null,
-            message: qrCode ? 'Scannez le QR' : 'Génération en cours, le QR apparaîtra au prochain rafraîchissement automatique.'
-        }
+        return { status: 'connecting', message: 'Démarrage en cours...' }
     } catch (e) {
         return { status: 'error', message: e.message }
     }
 }
 
-// API
-app.post('/connect/:userId', authMiddleware, async (req, res) => res.json(await startSession(req.params.userId)))
+app.post('/connect/:userId', authMiddleware, async (req, res) => {
+    const result = await startSession(req.params.userId)
+    res.json(result)
+})
+
 app.get('/status/:userId', authMiddleware, (req, res) => {
     res.json({
         status: connectionStatus.get(req.params.userId) || 'disconnected',
-        qrCode: qrCodes.get(req.params.userId)
+        qrCode: qrCodes.get(req.params.userId),
+        phoneNumber: activeSockets.get(req.params.userId)?.user?.id.split(':')[0]
     })
 })
 
-// Démarrage
-app.listen(PORT, HOST, () => {
-    console.log(`✅ Serveur WhatsApp actif sur http://${HOST}:${PORT}`)
+app.delete('/disconnect/:userId', authMiddleware, async (req, res) => {
+    const socket = activeSockets.get(req.params.userId)
+    if (socket) await socket.logout()
+    activeSockets.delete(req.params.userId)
+    res.json({ success: true })
 })
+
+app.listen(PORT, HOST, () => console.log(`🚀 Microservice prêt sur ${PORT}`))
