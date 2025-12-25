@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(status)
     } catch (error: any) {
         console.error('[Vercel API] Erreur GET /status:', error.message)
-        return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+        return NextResponse.json({ error: 'Erreur serveur', details: error.message }, { status: 500 })
     }
 }
 

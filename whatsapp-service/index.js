@@ -63,12 +63,22 @@ async function startSession(userId) {
     }
 
     try {
+        console.log(`[Session] Démarrage processus pour ${userId}`)
         const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
         const sessionPath = path.join(__dirname, 'sessions', userId)
-        if (!fs.existsSync(path.join(__dirname, 'sessions'))) fs.mkdirSync(path.join(__dirname, 'sessions'), { recursive: true })
+        console.log(`[Session] Chemin : ${sessionPath}`)
+
+        if (!fs.existsSync(path.join(__dirname, 'sessions'))) {
+            fs.mkdirSync(path.join(__dirname, 'sessions'), { recursive: true })
+            console.log(`[Session] Dossier sessions créé`)
+        }
 
         const { state, saveCreds } = await useMultiFileAuthState(sessionPath)
+        console.log(`[Session] Auth state chargé`)
+
         const { version } = await fetchLatestBaileysVersion()
+        console.log(`[Session] Baileys version : ${version}`)
 
         const socket = makeWASocket({
             version,
