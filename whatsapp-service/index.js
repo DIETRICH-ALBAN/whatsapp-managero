@@ -53,21 +53,38 @@ const authMiddleware = (req, res, next) => {
 app.get('/', (req, res) => res.json({ status: 'online', service: 'VIBE WhatsApp' }))
 
 async function startSession(userId) {
-    if (activeSockets.has(userId)) return { status: connectionStatus.get(userId) || 'connecting' }
+    if (activeSockets.has(userId)) {
+        console.log(`[Session] Déjà active pour ${userId}`)
+        return {
+            status: connectionStatus.get(userId) || 'connecting',
+            qrCode: qrCodes.get(userId)
+        }
+    }
 
     try {
         console.log(`[Session] Démarrage pour ${userId}`)
         const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
         const sessionDir = path.join(__dirname, 'sessions')
-        if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true })
-
         const sessionPath = path.join(sessionDir, userId)
 
-        // --- FIX CRITIQUE ---
-        // On vérifie que la fonction existe bien avant de l'appeler
-        if (typeof useMultiFileAuthState !== 'function') {
-            throw new Error("Erreur d'importation Baileys: useMultiFileAuthState n'est pas une fonction");
+        // Nettoyage dossier au cas où
+        if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true })
+
+        // 1. Restaurer depuis Supabase si le dossier est vide
+        if (!fs.existsSync(path.join(sessionPath, 'creds.json'))) {
+            console.log(`[Session] Restauration depuis Supabase pour ${userId}...`)
+            const { data: session } = await supabase
+                .from('whatsapp_sessions')
+                .select('creds')
+                .eq('user_id', userId)
+                .single()
+
+            if (session?.creds) {
+                if (!fs.existsSync(sessionPath)) fs.mkdirSync(sessionPath, { recursive: true })
+                fs.writeFileSync(path.join(sessionPath, 'creds.json'), session.creds)
+                console.log(`[Session] Creds restaurés avec succès`)
+            }
         }
 
         const { state, saveCreds } = await useMultiFileAuthState(sessionPath)
@@ -76,13 +93,23 @@ async function startSession(userId) {
         const socket = makeWASocket.default ? makeWASocket.default({
             version,
             auth: state,
-            browser: ['VIBE Agent', 'Chrome', '120.0.0'],
-            logger: pino({ level: 'silent' })
+            printQRInTerminal: true,
+            browser: ['VibeVendor', 'Chrome', '1.0.0'],
+            logger: pino({ level: 'info' }), // Un peu plus de logs pour le debug
+            connectTimeoutMs: 60000,
+            defaultQueryTimeoutMs: 0,
+            keepAliveIntervalMs: 10000,
+            generateHighQualityLinkPreview: true
         }) : makeWASocket({
             version,
             auth: state,
-            browser: ['VIBE Agent', 'Chrome', '120.0.0'],
-            logger: pino({ level: 'silent' })
+            printQRInTerminal: true,
+            browser: ['VibeVendor', 'Chrome', '1.0.0'],
+            logger: pino({ level: 'info' }),
+            connectTimeoutMs: 60000,
+            defaultQueryTimeoutMs: 0,
+            keepAliveIntervalMs: 10000,
+            generateHighQualityLinkPreview: true
         })
 
         activeSockets.set(userId, socket)
@@ -92,7 +119,8 @@ async function startSession(userId) {
             const { connection, lastDisconnect, qr } = update
             if (qr) {
                 console.log(`[QR] Nouveau code pour ${userId}`)
-                qrCodes.set(userId, await QRCode.toDataURL(qr))
+                const qrData = await QRCode.toDataURL(qr)
+                qrCodes.set(userId, qrData)
             }
 
             if (connection === 'open') {
@@ -117,7 +145,21 @@ async function startSession(userId) {
             }
         })
 
-        socket.ev.on('creds.update', saveCreds)
+        socket.ev.on('creds.update', async () => {
+            await saveCreds()
+            // Sauvegarder également dans Supabase pour la persistance cloud
+            try {
+                const credsContent = fs.readFileSync(path.join(sessionPath, 'creds.json'), 'utf-8')
+                await supabase.from('whatsapp_sessions').upsert({
+                    user_id: userId,
+                    creds: credsContent,
+                    updated_at: new Date().toISOString()
+                })
+                console.log(`[Session] Creds sauvegardés sur Supabase pour ${userId}`)
+            } catch (err) {
+                console.error(`[Session] Erreur sauvegarde Supabase:`, err.message)
+            }
+        })
 
         // === ÉCOUTE DES MESSAGES ENTRANTS ===
         socket.ev.on('messages.upsert', async (m) => {
@@ -280,6 +322,17 @@ app.get('/status/:userId', authMiddleware, (req, res) => {
         status: connectionStatus.get(req.params.userId) || 'disconnected',
         qrCode: qrCodes.get(req.params.userId),
         phoneNumber: activeSockets.get(req.params.userId)?.user?.id.split(':')[0]
+    })
+})
+
+app.get('/debug/:userId', authMiddleware, (req, res) => {
+    const userId = req.params.userId
+    res.json({
+        hasSocket: activeSockets.has(userId),
+        status: connectionStatus.get(userId),
+        hasQr: !!qrCodes.get(userId),
+        qrLength: qrCodes.get(userId)?.length || 0,
+        sessionExists: fs.existsSync(path.join(__dirname, 'sessions', userId))
     })
 })
 app.delete('/disconnect/:userId', authMiddleware, async (req, res) => {
