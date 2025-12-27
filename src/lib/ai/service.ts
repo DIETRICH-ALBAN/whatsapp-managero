@@ -4,7 +4,12 @@ import OpenAI from 'openai'
 // Dans un vrai prod, on gérerait ça via des variables d'env sécurisées ou KMS
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
-    dangerouslyAllowBrowser: true // À supprimer si on passe full server-side
+    baseURL: "https://openrouter.ai/api/v1",
+    defaultHeaders: {
+        "HTTP-Referer": "https://whatsapp-managero.vercel.app", // Optionnel, pour OpenRouter
+        "X-Title": "VibeVendor", // Optionnel
+    },
+    dangerouslyAllowBrowser: true
 })
 
 interface ChatMessage {
@@ -18,7 +23,7 @@ export async function generateAIResponse(
 ) {
     try {
         const response = await openai.chat.completions.create({
-            model: config.model || 'gpt-4o-mini',
+            model: config.model || 'openai/gpt-4o-mini',
             messages: messages,
             temperature: config.temperature || 0.7,
             max_tokens: 500,

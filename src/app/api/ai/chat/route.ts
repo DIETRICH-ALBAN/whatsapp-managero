@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
         // Config par défaut si non trouvée
         const systemPrompt = agentConfig?.system_prompt ||
             "Tu es un assistant virtuel utile et professionnel. Tu aides le client en répondant brièvement et poliment."
-        const model = agentConfig?.model || 'gpt-4o-mini'
+        const model = agentConfig?.model || 'openai/gpt-4o-mini'
 
         // 2. Récupérer l'historique récent (5 derniers messages)
         const { data: history } = await supabase
