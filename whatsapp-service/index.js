@@ -126,12 +126,34 @@ async function startSession(userId) {
                 // Ignorer les messages de statut et les messages envoyés par nous
                 if (msg.key.fromMe || msg.key.remoteJid === 'status@broadcast') continue
 
-                const senderNumber = msg.key.remoteJid.split('@')[0]
-                const messageContent = msg.message?.conversation ||
-                    msg.message?.extendedTextMessage?.text ||
-                    '[Média non supporté]'
+                const jid = msg.key.remoteJid
+                const senderNumber = jid.split('@')[0]
+                const pushName = msg.pushName || senderNumber
 
-                console.log(`[Message] Nouveau de ${senderNumber}: ${messageContent.substring(0, 50)}...`)
+                let messageContent = ''
+                let messageType = 'text'
+
+                if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
+                    messageContent = msg.message?.conversation || msg.message?.extendedTextMessage?.text
+                    messageType = 'text'
+                } else if (msg.message?.imageMessage) {
+                    messageContent = '📷 Photo'
+                    messageType = 'image'
+                } else if (msg.message?.videoMessage) {
+                    messageContent = '🎥 Vidéo'
+                    messageType = 'video'
+                } else if (msg.message?.audioMessage) {
+                    messageContent = '🎵 Audio'
+                    messageType = 'audio'
+                } else if (msg.message?.documentMessage) {
+                    messageContent = '📄 Document'
+                    messageType = 'document'
+                } else {
+                    messageContent = '[Média non supporté]'
+                    messageType = 'other'
+                }
+
+                console.log(`[Message] De ${pushName}: ${messageContent}`)
 
                 try {
                     // 1. Trouver ou créer la conversation
@@ -148,7 +170,7 @@ async function startSession(userId) {
                             .insert({
                                 user_id: userId,
                                 contact_phone: senderNumber,
-                                contact_name: senderNumber,
+                                contact_name: pushName,
                                 last_message: messageContent,
                                 unread_count: 1
                             })
@@ -160,9 +182,10 @@ async function startSession(userId) {
                         await supabase
                             .from('conversations')
                             .update({
+                                contact_name: pushName, // On met à jour le nom si dispo
                                 last_message: messageContent,
                                 last_message_at: new Date().toISOString(),
-                                unread_count: supabase.sql`unread_count + 1`
+                                unread_count: 1 // On peut incrémenter ou logiques plus complexes
                             })
                             .eq('id', conversation.id)
                     }
@@ -172,6 +195,7 @@ async function startSession(userId) {
                         conversation_id: conversation.id,
                         contact_phone: senderNumber,
                         content: messageContent,
+                        message_type: messageType,
                         direction: 'inbound',
                         status: 'received'
                     })
