@@ -190,17 +190,77 @@ async function startSession(userId) {
                             .eq('id', conversation.id)
                     }
 
-                    // 2. Enregistrer le message
-                    await supabase.from('messages').insert({
+                    // 2. Enregistrer le message entrant
+                    const { data: savedMsg } = await supabase.from('messages').insert({
                         conversation_id: conversation.id,
                         contact_phone: senderNumber,
                         content: messageContent,
                         message_type: messageType,
                         direction: 'inbound',
                         status: 'received'
-                    })
+                    }).select().single()
 
                     console.log(`[Message] Enregistré dans conversation ${conversation.id}`)
+
+                    // === AUTOMATISATION IA ===
+                    // 3. Vérifier si l'IA est activée pour cet utilisateur
+                    const { data: agentConfig } = await supabase
+                        .from('agent_configs')
+                        .select('*')
+                        .eq('user_id', userId)
+                        .single()
+
+                    if (agentConfig?.is_active && messageType === 'text') {
+                        console.log(`[IA] Agent actif pour ${userId}. Génération de réponse...`)
+
+                        // Appeler l'API Vercel pour générer la réponse (on utilise fetch)
+                        // Note: On pourrait aussi le faire en local mais passer par Vercel centralise le cerveau
+                        const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-managero.vercel.app'
+
+                        try {
+                            // On simule un délai de "frappe" pour faire plus humain
+                            await new Promise(resolve => setTimeout(resolve, 2000))
+
+                            const aiResponse = await fetch(`${SITE_URL}/api/ai/chat`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'x-api-secret': API_SECRET // Sécurité pour éviter les appels externes
+                                },
+                                body: JSON.stringify({
+                                    conversationId: conversation.id,
+                                    message: messageContent
+                                })
+                            })
+
+                            const aiData = await aiResponse.json()
+
+                            if (aiData.response) {
+                                // Envoyer la réponse sur WhatsApp
+                                await socket.sendMessage(jid, { text: aiData.response })
+                                console.log(`[IA] Réponse envoyée à ${senderNumber}`)
+
+                                // Enregistrer la réponse de l'IA dans Supabase
+                                await supabase.from('messages').insert({
+                                    conversation_id: conversation.id,
+                                    contact_phone: senderNumber,
+                                    content: aiData.response,
+                                    direction: 'outbound',
+                                    status: 'sent',
+                                    is_ai_generated: true
+                                })
+
+                                // Mettre à jour la conversation
+                                await supabase.from('conversations').update({
+                                    last_message: aiData.response,
+                                    last_message_at: new Date().toISOString()
+                                }).eq('id', conversation.id)
+                            }
+                        } catch (aiErr) {
+                            console.error(`[IA] Erreur génération:`, aiErr.message)
+                        }
+                    }
+
                 } catch (dbError) {
                     console.error(`[Message] Erreur DB:`, dbError.message)
                 }

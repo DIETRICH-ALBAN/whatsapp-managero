@@ -5,9 +5,30 @@ import { generateAIResponse } from '@/lib/ai/service'
 export async function POST(request: NextRequest) {
     try {
         const supabase = await createClient()
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        const authHeader = request.headers.get('x-api-secret')
+        let userId: string | null = null
 
-        if (authError || !user) {
+        // 1. Authentification soit par session, soit par API SECRET
+        if (authHeader && authHeader === process.env.WHATSAPP_SERVICE_SECRET) {
+            // Appel interne depuis le microservice Railway
+            // Dans ce cas, on doit passer le userId dans le body car on n'a pas de session
+            const bodyPeek = await request.clone().json()
+            // On va chercher le userId associé à la conversation
+            const { data: conv } = await supabase
+                .from('conversations')
+                .select('user_id')
+                .eq('id', bodyPeek.conversationId)
+                .single()
+            userId = conv?.user_id
+        } else {
+            // Appel depuis le frontend (session utilisateur)
+            const { data: { user }, error: authError } = await supabase.auth.getUser()
+            if (!authError && user) {
+                userId = user.id
+            }
+        }
+
+        if (!userId) {
             return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
         }
 
@@ -22,7 +43,7 @@ export async function POST(request: NextRequest) {
         const { data: agentConfig } = await supabase
             .from('agent_configs')
             .select('*')
-            .eq('user_id', user.id)
+            .eq('user_id', userId)
             .single()
 
         // Config par défaut si non trouvée
