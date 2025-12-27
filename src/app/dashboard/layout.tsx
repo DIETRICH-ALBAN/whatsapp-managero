@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
+import { MobileNav } from '@/components/dashboard/MobileNav'
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<any>(null)
     const [loading, setLoading] = useState(true)
@@ -38,10 +40,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return (
         <div className="flex min-h-screen bg-background-deep">
             <Sidebar />
-            <div className="flex-1 flex flex-col min-w-0">
+            <MobileNav />
+            <div className="flex-1 flex flex-col min-w-0 mb-16 md:mb-0">
                 <Header user={user} />
-                <main className="flex-1 p-8 overflow-y-auto">
-                    <div className="max-w-6xl mx-auto">
+                <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+                    <div className="max-w-6xl mx-auto h-full">
                         {children}
                     </div>
                 </main>

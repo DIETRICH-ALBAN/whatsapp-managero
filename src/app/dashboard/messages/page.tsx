@@ -221,7 +221,7 @@ export default function MessagesPage() {
     }
 
     return (
-        <div className="flex h-[calc(100vh-8rem)] bg-card rounded-3xl overflow-hidden border border-border shadow-2xl relative">
+        <div className="flex h-[calc(100vh-13rem)] md:h-[calc(100vh-8rem)] bg-card rounded-3xl overflow-hidden border border-border shadow-2xl relative">
 
             {/* LEFT PANEL: Conversations List */}
             <div className={cn(
