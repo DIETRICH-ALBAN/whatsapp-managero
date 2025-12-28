@@ -169,12 +169,22 @@ async function startSession(userId) {
                 if (msg.key.fromMe || msg.key.remoteJid === 'status@broadcast') continue
 
                 const jid = msg.key.remoteJid
+                const isGroup = jid.endsWith('@g.us')
                 const senderNumber = jid.split('@')[0]
-                const pushName = msg.pushName || senderNumber
+                const participant = msg.key.participant ? msg.key.participant.split('@')[0] : senderNumber
+
+                // Pour un groupe, on veut peut-être afficher "Nom du Groupe" au lieu du numéro
+                let contactName = msg.pushName || senderNumber
+                if (isGroup) {
+                    // On pourrait essayer de récupérer le nom du groupe, mais Baileys le donne dans un autre event
+                    // Pour l'instant on garde l'ID ou on marque "Groupe"
+                    contactName = `Groupe: ${senderNumber.substring(0, 10)}...`
+                }
 
                 let messageContent = ''
                 let messageType = 'text'
 
+                // Extraction du texte... (code existant)
                 if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
                     messageContent = msg.message?.conversation || msg.message?.extendedTextMessage?.text
                     messageType = 'text'
@@ -191,17 +201,19 @@ async function startSession(userId) {
                     messageContent = '📄 Document'
                     messageType = 'document'
                 } else {
-                    messageContent = '[Média non supporté]'
+                    messageContent = '[Média]'
                     messageType = 'other'
                 }
 
-                console.log(`[Message] De ${pushName}: ${messageContent}`)
+                if (!messageContent) continue
+
+                console.log(`[Message] ${isGroup ? '(Groupe)' : '(Privé)'} ${contactName}: ${messageContent}`)
 
                 try {
                     // 1. Trouver ou créer la conversation
                     let { data: conversation } = await supabase
                         .from('conversations')
-                        .select('id')
+                        .select('id, contact_name')
                         .eq('user_id', userId)
                         .eq('contact_phone', senderNumber)
                         .single()
@@ -212,7 +224,7 @@ async function startSession(userId) {
                             .insert({
                                 user_id: userId,
                                 contact_phone: senderNumber,
-                                contact_name: pushName,
+                                contact_name: contactName,
                                 last_message: messageContent,
                                 unread_count: 1
                             })
@@ -220,31 +232,29 @@ async function startSession(userId) {
                             .single()
                         conversation = newConvo
                     } else {
-                        // Mettre à jour la conversation existante
+                        // Mettre à jour (incremente unread_count)
+                        await supabase.rpc('increment_unread_count', { convo_id: conversation.id })
                         await supabase
                             .from('conversations')
                             .update({
-                                contact_name: pushName, // On met à jour le nom si dispo
+                                contact_name: conversation.contact_name || contactName,
                                 last_message: messageContent,
                                 last_message_at: new Date().toISOString(),
-                                unread_count: 1 // On peut incrémenter ou logiques plus complexes
                             })
                             .eq('id', conversation.id)
                     }
 
-                    // 2. Enregistrer le message entrant
-                    const { data: savedMsg } = await supabase.from('messages').insert({
+                    // 2. Enregistrer le message
+                    await supabase.from('messages').insert({
                         conversation_id: conversation.id,
-                        contact_phone: senderNumber,
+                        contact_phone: isGroup ? participant : senderNumber,
                         content: messageContent,
                         message_type: messageType,
                         direction: 'inbound',
                         status: 'received'
-                    }).select().single()
+                    })
 
-                    console.log(`[Message] Enregistré dans conversation ${conversation.id}`)
-
-                    // === AUTOMATISATION IA ===
+                    // === AUTOMATISATION IA (UNIQUEMENT PRIVÉ) ===
                     // 3. Vérifier si l'IA est activée pour cet utilisateur
                     const { data: agentConfig } = await supabase
                         .from('agent_configs')
@@ -252,8 +262,9 @@ async function startSession(userId) {
                         .eq('user_id', userId)
                         .single()
 
-                    if (agentConfig?.is_active && messageType === 'text') {
+                    if (!isGroup && agentConfig?.is_active && messageType === 'text') {
                         console.log(`[IA] Agent actif pour ${userId}. Génération de réponse...`)
+                        // ... reste de la logique
 
                         // Appeler l'API Vercel pour générer la réponse (on utilise fetch)
                         // Note: On pourrait aussi le faire en local mais passer par Vercel centralise le cerveau
