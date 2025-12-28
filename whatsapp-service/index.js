@@ -232,14 +232,14 @@ async function startSession(userId) {
                             .single()
                         conversation = newConvo
                     } else {
-                        // Mettre à jour (incremente unread_count)
-                        await supabase.rpc('increment_unread_count', { convo_id: conversation.id })
+                        // Mettre à jour la conversation
                         await supabase
                             .from('conversations')
                             .update({
                                 contact_name: conversation.contact_name || contactName,
                                 last_message: messageContent,
                                 last_message_at: new Date().toISOString(),
+                                unread_count: (conversation.unread_count || 0) + 1
                             })
                             .eq('id', conversation.id)
                     }
@@ -264,7 +264,6 @@ async function startSession(userId) {
 
                     if (!isGroup && agentConfig?.is_active && messageType === 'text') {
                         console.log(`[IA] Agent actif pour ${userId}. Génération de réponse...`)
-                        // ... reste de la logique
 
                         // Appeler l'API Vercel pour générer la réponse (on utilise fetch)
                         // Note: On pourrait aussi le faire en local mais passer par Vercel centralise le cerveau
