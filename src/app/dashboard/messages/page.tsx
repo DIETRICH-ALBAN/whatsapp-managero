@@ -13,15 +13,31 @@ import {
     Check,
     CheckCheck,
     Loader2,
-    ArrowLeft
+    ArrowLeft,
+    Sparkles,
+    Bot,
+    Trash2
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { createClient } from '@/lib/supabase'
 import { formatDistanceToNow } from 'date-fns'
-import { fr } from 'date-fns/locale/fr'
+import { fr } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+
+// Types (Frontend definitions matching DB)
+interface Message {
+    id: string
+    content: string
+    direction: 'inbound' | 'outbound'
+    status: 'sent' | 'delivered' | 'read' | 'failed' | 'received'
+    created_at: string
+    is_ai_generated?: boolean
+    conversation_id: string
+}
 
 // Types (Frontend definitions matching DB)
 interface Conversation {
@@ -33,25 +49,28 @@ interface Conversation {
     unread_count: number
     status: 'active' | 'archived'
     updated_at: string
+    intent_tag?: 'interested' | 'support' | 'question' | 'spam' | 'other'
+    priority_score?: number
+    agent_id?: string
+    is_ai_enabled?: boolean
+    summary?: string
 }
 
-interface Message {
+interface Agent {
     id: string
-    content: string
-    direction: 'inbound' | 'outbound'
-    status: 'sent' | 'delivered' | 'read' | 'failed'
-    created_at: string
-    is_ai_generated?: boolean
-    conversation_id: string
+    name: string
 }
 
 export default function MessagesPage() {
     const [conversations, setConversations] = useState<Conversation[]>([])
     const [messages, setMessages] = useState<Message[]>([])
     const [selectedConvoId, setSelectedConvoId] = useState<string | null>(null)
+    const [agents, setAgents] = useState<Agent[]>([])
     const [loadingConvos, setLoadingConvos] = useState(true)
     const [loadingMessages, setLoadingMessages] = useState(false)
     const [inputText, setInputText] = useState('')
+    const [suggestions, setSuggestions] = useState<string[]>([])
+    const [loadingSuggestions, setLoadingSuggestions] = useState(false)
 
     // Pour le mobile : afficher la liste ou le chat
     const [showChatOnMobile, setShowChatOnMobile] = useState(false)
@@ -59,30 +78,33 @@ export default function MessagesPage() {
     const scrollRef = useRef<HTMLDivElement>(null)
     const supabase = createClient()
 
-    // 1. Fetch Conversations
+    // 1. Fetch Conversations & Agents
     useEffect(() => {
         fetchConversations()
+        fetchAgents()
 
         // Realtime Subscription for Conversations list updates
         const channel = supabase
             .channel('conversations_list')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, (payload) => {
-                fetchConversations() // Simple reload for MVP
+                fetchConversations()
             })
             .subscribe()
 
-        return () => {
-            supabase.removeChannel(channel)
-        }
+        return () => { supabase.removeChannel(channel) }
     }, [])
+
+    const fetchAgents = async () => {
+        const { data } = await supabase.from('agent_configs').select('id, name')
+        if (data) setAgents(data)
+    }
 
     // 2. Fetch Messages when Conversation Selected
     useEffect(() => {
         if (!selectedConvoId) return
-
         fetchMessages(selectedConvoId)
+        setSuggestions([]) // Reset
 
-        // Realtime Subscription for Messages in active chat
         const channel = supabase
             .channel(`chat:${selectedConvoId}`)
             .on('postgres_changes', {
@@ -92,14 +114,17 @@ export default function MessagesPage() {
                 filter: `conversation_id=eq.${selectedConvoId}`
             }, (payload) => {
                 const newMsg = payload.new as Message
-                setMessages(prev => [...prev, newMsg])
+                setMessages(prev => {
+                    if (prev.find(m => m.id === newMsg.id)) return prev
+                    return [...prev, newMsg]
+                })
                 scrollToBottom()
+                // Si c'est un message entrant, on régénère des suggestions
+                if (newMsg.direction === 'inbound') fetchSuggestions(newMsg.content)
             })
             .subscribe()
 
-        return () => {
-            supabase.removeChannel(channel)
-        }
+        return () => { supabase.removeChannel(channel) }
     }, [selectedConvoId])
 
     const fetchConversations = async () => {
@@ -107,6 +132,7 @@ export default function MessagesPage() {
             const { data, error } = await supabase
                 .from('conversations')
                 .select('*')
+                .order('priority_score', { ascending: false })
                 .order('updated_at', { ascending: false })
 
             if (error) throw error
@@ -131,12 +157,47 @@ export default function MessagesPage() {
             if (data) {
                 setMessages(data)
                 scrollToBottom()
-                // Mark as read (Todo)
+                // Réinitialiser unread count
+                await supabase.from('conversations').update({ unread_count: 0 }).eq('id', chatId)
             }
         } catch (err) {
             console.error('Error loading messages:', err)
         } finally {
             setLoadingMessages(false)
+        }
+    }
+
+    const fetchSuggestions = async (message: string) => {
+        setLoadingSuggestions(true)
+        try {
+            const res = await fetch('/api/ai/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    conversationId: selectedConvoId,
+                    message: `Suggères 3 réponses courtes et professionnelles pour ce message: "${message}". Réponds UNIQUEMENT par une liste séparée par des points-virgules.`
+                })
+            })
+            const data = await res.json()
+            if (data.response) {
+                const suggs = data.response.split(';').map((s: string) => s.trim().replace(/^["-]\s?|["-]$/g, ''))
+                setSuggestions(suggs.slice(0, 3))
+            }
+        } catch (err) {
+            console.error('Suggestions error:', err)
+        } finally {
+            setLoadingSuggestions(false)
+        }
+    }
+
+    const updateConvoSetting = async (key: string, value: any) => {
+        if (!selectedConvoId) return
+        try {
+            await supabase.from('conversations').update({ [key]: value }).eq('id', selectedConvoId)
+            fetchConversations()
+            toast.success('Paramètre mis à jour')
+        } catch (err) {
+            toast.error('Erreur mise à jour')
         }
     }
 
@@ -146,24 +207,25 @@ export default function MessagesPage() {
         }, 100)
     }
 
-    const handleSendMessage = async () => {
-        if (!inputText.trim() || !selectedConvoId) return
+    const handleSendMessage = async (text?: string) => {
+        const content = text || inputText
+        if (!content.trim() || !selectedConvoId) return
 
         const currentConvo = conversations.find(c => c.id === selectedConvoId)
         if (!currentConvo) return
 
         // 1. Optimistic Update UI
         const optimisticMsg: Message = {
-            id: crypto.randomUUID(),
-            content: inputText,
+            id: `temp-${Date.now()}`,
+            content: content,
             direction: 'outbound',
             status: 'sent',
             created_at: new Date().toISOString(),
             conversation_id: selectedConvoId
         }
         setMessages(prev => [...prev, optimisticMsg])
-        const messageToSend = inputText
-        setInputText('')
+        if (!text) setInputText('')
+        setSuggestions([])
         scrollToBottom()
 
         // 2. Appel API pour envoyer via WhatsApp
@@ -173,51 +235,40 @@ export default function MessagesPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     phoneNumber: currentConvo.contact_phone,
-                    message: messageToSend,
+                    message: content,
                     conversationId: selectedConvoId
                 })
             })
 
-            const result = await response.json()
-
             if (!response.ok) {
-                console.error('Erreur envoi:', result.error)
-                // Marquer le message comme échoué
-                setMessages(prev => prev.map(m =>
-                    m.id === optimisticMsg.id ? { ...m, status: 'failed' } : m
-                ))
+                setMessages(prev => prev.map(m => m.id === optimisticMsg.id ? { ...m, status: 'failed' } : m))
             }
-
         } catch (err) {
-            console.error('Failed to send message:', err)
-            setMessages(prev => prev.map(m =>
-                m.id === optimisticMsg.id ? { ...m, status: 'failed' } : m
-            ))
+            setMessages(prev => prev.map(m => m.id === optimisticMsg.id ? { ...m, status: 'failed' } : m))
         }
     }
 
     const activeConversation = conversations.find(c => c.id === selectedConvoId)
 
-    // Aide pour formater le numéro ou le nom
+    const getIntentInfo = (tag?: string) => {
+        switch (tag) {
+            case 'interested': return { label: 'Opportunité', color: 'bg-emerald-500', icon: Sparkles }
+            case 'support': return { label: 'Support', color: 'bg-blue-500', icon: Phone }
+            case 'question': return { label: 'Question', color: 'bg-amber-500', icon: Bot }
+            case 'spam': return { label: 'Spam', color: 'bg-red-500', icon: Trash2 }
+            default: return { label: null, color: 'bg-slate-400', icon: null }
+        }
+    }
+
     const formatIdentifier = (convo: Conversation) => {
         let name = convo.contact_name || convo.contact_phone
-        // Nettoyer les IDs techniques si c'est juste des chiffres
-        if (/^\d+$/.test(name) && name.includes('120363')) {
-            return `Groupe: ${convo.contact_phone.substring(0, 10)}...`
-        }
-        // Ajouter un + si c'est un numéro pur
-        if (/^\d+$/.test(name) && !name.startsWith('+')) {
-            return `+${name}`
-        }
+        if (/^\d+$/.test(name) && name.includes('120363')) return `Groupe: ${convo.contact_phone.substring(0, 10)}...`
+        if (/^\d+$/.test(name) && !name.startsWith('+')) return `+${name}`
         return name
     }
 
     if (loadingConvos) {
-        return (
-            <div className="h-full flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-            </div>
-        )
+        return <div className="h-full flex items-center justify-center"><Loader2 className="w-8 h-8 text-indigo-500 animate-spin" /></div>
     }
 
     return (
@@ -232,241 +283,176 @@ export default function MessagesPage() {
                     <h2 className="text-xl font-bold mb-4 px-2">Messages</h2>
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Rechercher un client..."
-                            className="pl-9 bg-muted/50 border-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-xl"
-                        />
+                        <Input placeholder="Rechercher..." className="pl-9 bg-muted/50 border-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-xl" />
                     </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
-                    {conversations.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full p-8 text-muted-foreground text-center">
-                            <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                                <Search className="w-8 h-8 opacity-20" />
-                            </div>
-                            <p>Aucune conversation trouvée</p>
-                            <p className="text-xs mt-1">Vos messages WhatsApp apparaîtront ici.</p>
-                        </div>
-                    ) : (
-                        conversations.map(convo => (
+                    {conversations.map(convo => {
+                        const intent = getIntentInfo(convo.intent_tag)
+                        return (
                             <div
                                 key={convo.id}
-                                onClick={() => {
-                                    setSelectedConvoId(convo.id)
-                                    setShowChatOnMobile(true)
-                                }}
+                                onClick={() => { setSelectedConvoId(convo.id); setShowChatOnMobile(true); }}
                                 className={cn(
                                     "p-4 flex gap-4 cursor-pointer transition-all border-b border-border/30 hover:bg-indigo-500/5 items-center",
-                                    selectedConvoId === convo.id ? "bg-indigo-500/10 border-l-4 border-l-indigo-500" : "border-l-4 border-l-transparent"
+                                    selectedConvoId === convo.id ? "bg-indigo-500/10 border-l-4 border-l-indigo-500 shadow-inner" : "border-l-4 border-l-transparent"
                                 )}
                             >
                                 <div className="relative">
                                     <Avatar className="w-12 h-12 border-2 border-background shadow-sm">
-                                        <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold text-lg">
+                                        <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold">
                                             {convo.contact_name?.[0]?.toUpperCase() || convo.contact_phone?.[0]}
                                         </AvatarFallback>
                                     </Avatar>
-                                    {/* Badge IA Actif */}
-                                    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-purple-600 rounded-full border-2 border-background flex items-center justify-center shadow-lg" title="Agent IA Actif">
-                                        <Mic className="w-2.5 h-2.5 text-white" />
-                                    </div>
+                                    {convo.is_ai_enabled !== false && (
+                                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-purple-600 rounded-full border-2 border-background flex items-center justify-center shadow-lg">
+                                            <Bot className="w-2.5 h-2.5 text-white" />
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex justify-between items-center mb-1">
-                                        <h4 className={cn("text-sm font-bold truncate",
-                                            selectedConvoId === convo.id ? "text-indigo-600 dark:text-indigo-400" : "text-foreground"
-                                        )}>
+                                    <div className="flex justify-between items-center mb-0.5">
+                                        <h4 className={cn("text-xs font-bold truncate", selectedConvoId === convo.id ? "text-indigo-600 dark:text-indigo-400" : "text-foreground")}>
                                             {formatIdentifier(convo)}
                                         </h4>
-                                        <span className="text-[10px] text-muted-foreground font-medium shrink-0">
-                                            {convo.last_message_at && formatDistanceToNow(new Date(convo.last_message_at), { locale: fr, addSuffix: false }).replace('environ ', '')}
+                                        <span className="text-[9px] text-muted-foreground font-medium shrink-0">
+                                            {convo.last_message_at && formatDistanceToNow(new Date(convo.last_message_at), { locale: fr })}
                                         </span>
                                     </div>
+
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        {intent.label && (
+                                            <span className={cn("text-[8px] px-1.5 py-0.5 rounded-full text-white font-bold", intent.color)}>
+                                                {intent.label}
+                                            </span>
+                                        )}
+                                        {convo.priority_score && convo.priority_score > 50 && (
+                                            <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 font-bold border border-red-200">
+                                                Prioritaire
+                                            </span>
+                                        )}
+                                    </div>
+
                                     <div className="flex items-center justify-between gap-2">
-                                        <p className="text-xs text-muted-foreground truncate leading-tight flex-1">
+                                        <p className="text-[10px] text-muted-foreground truncate leading-tight flex-1">
                                             {convo.last_message || "Nouvelle discussion"}
                                         </p>
                                         {convo.unread_count > 0 && (
-                                            <span className="bg-indigo-600 text-white text-[10px] font-bold h-4 min-w-[1rem] px-1 rounded-full flex items-center justify-center shadow-sm">
+                                            <span className="bg-indigo-600 text-white text-[9px] font-bold h-3.5 min-w-[3.5] px-1 rounded-full flex items-center justify-center">
                                                 {convo.unread_count}
                                             </span>
                                         )}
                                     </div>
                                 </div>
                             </div>
-                        ))
-                    )}
+                        )
+                    })}
                 </div>
             </div>
 
             {/* RIGHT PANEL: Chat Area */}
-            <div className={cn(
-                "flex-1 flex flex-col bg-background/50 backdrop-blur-sm",
-                !showChatOnMobile ? "hidden md:flex" : "flex"
-            )}>
+            <div className={cn("flex-1 flex flex-col bg-background/50 backdrop-blur-sm", !showChatOnMobile ? "hidden md:flex" : "flex")}>
                 {!selectedConvoId ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center bg-muted/5">
-                        <motion.div
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="w-24 h-24 rounded-full bg-indigo-500/10 flex items-center justify-center mb-6 shadow-inner"
-                        >
-                            <Phone className="w-10 h-10 text-indigo-500" />
-                        </motion.div>
-                        <h3 className="text-xl font-bold text-foreground mb-2">Vos messages WhatsApp</h3>
-                        <p className="max-w-xs mx-auto text-sm opacity-60">
-                            Sélectionnez une discussion pour répondre à vos clients ou laisser l'agent VIBE gérer la vente.
-                        </p>
+                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-muted/5">
+                        <Bot className="w-16 h-16 text-indigo-500/20 mb-4" />
+                        <h3 className="text-xl font-bold mb-2">Centre de Messagerie IA</h3>
+                        <p className="max-w-xs text-sm opacity-50">Gérez vos prospects et vos clients avec la puissance de l'IA.</p>
                     </div>
                 ) : (
                     <>
-                        {/* Header */}
                         <div className="h-16 px-4 border-b border-border flex items-center justify-between bg-card/80 backdrop-blur-md sticky top-0 z-20">
                             <div className="flex items-center gap-3">
-                                <Button variant="ghost" size="icon" className="md:hidden -ml-2 h-8 w-8" onClick={() => setShowChatOnMobile(false)}>
-                                    <ArrowLeft className="w-5 h-5 text-indigo-500" />
-                                </Button>
-
+                                <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setShowChatOnMobile(false)}><ArrowLeft className="w-5 h-5" /></Button>
                                 <Avatar className="w-10 h-10 border border-border shadow-sm">
-                                    <AvatarFallback className="bg-indigo-500/10 text-indigo-500 font-bold">
-                                        {activeConversation?.contact_name?.[0]?.toUpperCase()}
-                                    </AvatarFallback>
+                                    <AvatarFallback>{activeConversation?.contact_name?.[0]}</AvatarFallback>
                                 </Avatar>
                                 <div>
-                                    <h3 className="font-bold text-sm leading-none flex items-center gap-2">
-                                        {activeConversation && formatIdentifier(activeConversation)}
-                                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                                    </h3>
-                                    <p className="text-[10px] text-muted-foreground mt-1 font-medium italic">
-                                        Géré par l'Agent IA VIBE
-                                    </p>
+                                    <h3 className="font-bold text-xs">{activeConversation && formatIdentifier(activeConversation)}</h3>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                                        <p className="text-[9px] text-muted-foreground font-medium">En ligne</p>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-1">
-                                <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:bg-indigo-500/10 hover:text-indigo-500">
-                                    <Phone className="w-4 h-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:bg-indigo-500/10 hover:text-indigo-500">
-                                    <MoreVertical className="w-4 h-4" />
-                                </Button>
+
+                            {/* AI Control Bar */}
+                            <div className="flex items-center gap-2 bg-muted/30 p-1.5 rounded-xl border border-border">
+                                <Bot className={cn("w-4 h-4 transition-colors", activeConversation?.is_ai_enabled ? "text-indigo-500" : "text-muted-foreground")} />
+                                <div className="h-4 w-px bg-border" />
+                                <select
+                                    className="bg-transparent text-[10px] outline-none font-bold"
+                                    value={activeConversation?.agent_id || ''}
+                                    onChange={(e) => updateConvoSetting('agent_id', e.target.value)}
+                                >
+                                    <option value="">Agent par défaut</option>
+                                    {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                                </select>
+                                <Switch
+                                    className="scale-75"
+                                    checked={activeConversation?.is_ai_enabled}
+                                    onCheckedChange={(v) => updateConvoSetting('is_ai_enabled', v)}
+                                />
                             </div>
                         </div>
 
-                        {/* Messages */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/5 custom-scrollbar">
-                            <AnimatePresence initial={false}>
-                                {loadingMessages ? (
-                                    <div className="flex justify-center py-8">
-                                        <Loader2 className="w-6 h-6 animate-spin text-indigo-500/50" />
-                                    </div>
-                                ) : (
-                                    messages.map((msg, i) => {
-                                        const isMe = msg.direction === 'outbound'
-                                        return (
-                                            <motion.div
-                                                key={msg.id || i}
-                                                initial={{ opacity: 0, x: isMe ? 20 : -20 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                className={cn("flex w-full", isMe ? "justify-end" : "justify-start")}
-                                            >
-                                                <div className={cn(
-                                                    "max-w-[85%] md:max-w-[70%] rounded-2xl px-4 py-2.5 text-sm shadow-sm relative group transition-all",
-                                                    isMe
-                                                        ? "bg-indigo-600 text-white rounded-tr-none shadow-indigo-500/20"
-                                                        : "bg-card text-card-foreground border border-border rounded-tl-none"
-                                                )}>
-                                                    <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                                                    <div className={cn(
-                                                        "flex items-center justify-end gap-1.5 text-[9px] mt-1 opacity-60 font-medium",
-                                                        isMe ? "text-indigo-100" : "text-muted-foreground"
-                                                    )}>
-                                                        <span>
-                                                            {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true, locale: fr })}
-                                                        </span>
-                                                        {isMe && (
-                                                            <CheckCheck className="w-3 h-3" />
-                                                        )}
-                                                    </div>
-
-                                                    {msg.is_ai_generated && (
-                                                        <div className="absolute -top-2.5 -right-2 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 text-[9px] px-2 py-0.5 rounded-full shadow-lg border border-indigo-200 dark:border-indigo-800 flex items-center gap-1 font-bold backdrop-blur-sm">
-                                                            <Mic className="w-2.5 h-2.5" /> IA
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </motion.div>
-                                        )
-                                    })
-                                )}
-                            </AnimatePresence>
-                            <div ref={scrollRef} className="h-4" />
+                            {messages.map((msg, i) => {
+                                const isMe = msg.direction === 'outbound'
+                                return (
+                                    <motion.div key={msg.id || i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={cn("flex w-full", isMe ? "justify-end" : "justify-start")}>
+                                        <div className={cn(
+                                            "max-w-[80%] rounded-2xl px-3.5 py-2 text-xs shadow-sm relative group",
+                                            isMe ? "bg-indigo-600 text-white rounded-tr-none" : "bg-card border border-border rounded-tl-none"
+                                        )}>
+                                            <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                                            {msg.is_ai_generated && (
+                                                <div className="absolute -top-2 -right-2 bg-indigo-100 text-indigo-700 text-[8px] px-1.5 py-0.5 rounded-full font-bold shadow-md border border-indigo-200">IA</div>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                )
+                            })}
+                            <div ref={scrollRef} className="h-2" />
                         </div>
 
-                        {/* Input Area */}
-                        <div className="p-4 bg-card/80 backdrop-blur-md border-t border-border mt-auto">
-                            <div className="flex items-end gap-3 max-w-4xl mx-auto bg-muted/50 p-2 rounded-2xl border border-border focus-within:border-indigo-500/50 focus-within:ring-4 focus-within:ring-indigo-500/5 transition-all">
-                                <Button size="icon" variant="ghost" className="text-muted-foreground h-10 w-10 shrink-0 hover:bg-indigo-500/10 hover:text-indigo-500 rounded-xl">
-                                    <Paperclip className="w-5 h-5" />
-                                </Button>
+                        {/* Suggestions Area */}
+                        {suggestions.length > 0 && (
+                            <div className="px-4 py-2 flex gap-2 overflow-x-auto no-scrollbar bg-indigo-500/5 backdrop-blur-sm border-t border-indigo-500/10">
+                                {suggestions.map((s, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => handleSendMessage(s)}
+                                        className="whitespace-nowrap bg-white dark:bg-slate-800 text-[10px] px-3 py-1.5 rounded-full border border-indigo-200 text-indigo-600 font-medium hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                                    >
+                                        {s}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
 
+                        <div className="p-4 bg-card/80 backdrop-blur-md border-t border-border mt-auto">
+                            <div className="flex items-end gap-2 max-w-4xl mx-auto bg-muted/30 p-2 rounded-2xl border border-border focus-within:ring-2 focus-within:ring-indigo-500/20">
+                                <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0"><Paperclip className="w-4 h-4" /></Button>
                                 <textarea
-                                    placeholder="Répondre à votre client..."
-                                    className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-2.5 min-h-[44px] max-h-32 resize-none custom-scrollbar outline-none"
+                                    className="flex-1 bg-transparent border-none focus:ring-0 text-xs py-2 min-h-[40px] max-h-32 resize-none outline-none"
                                     rows={1}
                                     value={inputText}
-                                    onChange={(e) => {
-                                        setInputText(e.target.value)
-                                        e.target.style.height = 'auto'
-                                        e.target.style.height = `${e.target.scrollHeight}px`
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                            e.preventDefault()
-                                            handleSendMessage()
-                                        }
-                                    }}
+                                    placeholder="Écrire un message..."
+                                    onChange={(e) => { setInputText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = `${e.target.scrollHeight}px`; }}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
                                 />
-
-                                <div className="flex items-center gap-1 shrink-0 px-2 pb-0.5">
-                                    <Button
-                                        size="icon"
-                                        className={cn(
-                                            "h-10 w-10 rounded-xl transition-all shadow-lg",
-                                            inputText.trim()
-                                                ? "bg-indigo-600 hover:bg-indigo-700 text-white scale-110"
-                                                : "bg-muted text-muted-foreground scale-100 cursor-not-allowed"
-                                        )}
-                                        onClick={handleSendMessage}
-                                        disabled={!inputText.trim()}
-                                    >
-                                        <Send className="w-4 h-4" />
-                                    </Button>
-                                </div>
+                                <Button size="icon" className={cn("h-9 w-9 shrink-0 rounded-xl", inputText.trim() ? "bg-indigo-600" : "bg-muted text-muted-foreground")} onClick={() => handleSendMessage()} disabled={!inputText.trim()}><Send className="w-4 h-4" /></Button>
                             </div>
-                            <p className="text-[10px] text-center text-muted-foreground mt-3 opacity-50 flex items-center justify-center gap-1">
-                                <Mic className="w-2 h-2" /> L'Agent IA peut répondre pour vous si vous ne le faites pas.
-                            </p>
                         </div>
                     </>
                 )}
             </div>
-
             <style jsx global>{`
-                .custom-scrollbar::-webkit-scrollbar {
-                    width: 4px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-track {
-                    background: transparent;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: rgba(99, 102, 241, 0.1);
-                    border-radius: 10px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                    background: rgba(99, 102, 241, 0.3);
-                }
+                .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.1); border-radius: 10px; }
+                .no-scrollbar::-webkit-scrollbar { display: none; }
             `}</style>
         </div>
     )

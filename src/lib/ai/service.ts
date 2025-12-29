@@ -35,3 +35,27 @@ export async function generateAIResponse(
         throw new Error(`AI Generation failed: ${error.message}`)
     }
 }
+
+/**
+ * Analyse l'intention d'un message pour le tagging intelligent
+ */
+export async function analyzeIntent(message: string) {
+    try {
+        const prompt = `Analyses le message suivant reçu sur WhatsApp et réponds UNIQUEMENT avec un objet JSON au format:
+{"tag": "interested" | "support" | "question" | "spam" | "other", "priority": 0-100, "summary": "bref résumé"}
+
+Message: "${message}"`
+
+        const response = await openai.chat.completions.create({
+            model: 'openai/gpt-4o-mini',
+            messages: [{ role: 'user', content: prompt }],
+            response_format: { type: "json_object" },
+            temperature: 0,
+        })
+
+        return JSON.parse(response.choices[0].message.content || '{}')
+    } catch (error) {
+        console.error('[AI Service] Intent Analysis Error:', error)
+        return { tag: 'other', priority: 0, summary: null }
+    }
+}

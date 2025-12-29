@@ -33,25 +33,51 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { conversationId, message } = body
+        const { conversationId, message, agentId } = body
 
         if (!conversationId) {
             return NextResponse.json({ error: 'Conversation ID requis' }, { status: 400 })
         }
 
-        // 1. Récupérer la config de l'agent
-        const { data: agentConfig } = await supabase
-            .from('agent_configs')
-            .select('*')
-            .eq('user_id', userId)
-            .single()
+        // 1. Récupérer la config de l'agent (spécifique ou par défaut)
+        let agentConfig = null
+        if (agentId) {
+            const { data } = await supabase
+                .from('agent_configs')
+                .select('*')
+                .eq('id', agentId)
+                .eq('user_id', userId) // Sécurité : l'agent doit appartenir à l'user
+                .single()
+            agentConfig = data
+        }
 
-        // Config par défaut si non trouvée
+        if (!agentConfig) {
+            const { data } = await supabase
+                .from('agent_configs')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('is_default', true)
+                .single()
+            agentConfig = data
+        }
+
+        // Si toujours rien, on essaye de prendre le premier disponible
+        if (!agentConfig) {
+            const { data } = await supabase
+                .from('agent_configs')
+                .select('*')
+                .eq('user_id', userId)
+                .limit(1)
+                .maybeSingle()
+            agentConfig = data
+        }
+
+        // Config par défaut si vraiment rien en DB
         const systemPrompt = agentConfig?.system_prompt ||
             "Tu es un assistant virtuel utile et professionnel. Tu aides le client en répondant brièvement et poliment."
         const model = agentConfig?.model || 'openai/gpt-4o-mini'
 
-        // 2. Récupérer l'historique récent (5 derniers messages)
+        // 2. Récupérer l'historique récent (10 derniers messages)
         const { data: history } = await supabase
             .from('messages')
             .select('content, direction')

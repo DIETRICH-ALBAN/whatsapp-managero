@@ -49,6 +49,7 @@ export default function DashboardPage() {
     const [revenue, setRevenue] = useState(0)
     const [ordersCount, setOrdersCount] = useState(0)
     const [aiCount, setAiCount] = useState(0)
+    const [customerCount, setCustomerCount] = useState(0)
 
     useEffect(() => {
         const fetchData = async () => {
@@ -56,35 +57,28 @@ export default function DashboardPage() {
                 const supabase = createClient()
 
                 // 1. Fetch Messages (Limit 5 recent)
-                const { data: msgs, error: msgError } = await supabase
+                const { data: msgs } = await supabase
                     .from('messages')
                     .select('*')
                     .order('created_at', { ascending: false })
                     .limit(5)
-
                 if (msgs) setMessages(msgs)
 
-                // 2. Fetch Orders (Limit 5 recent)
-                const { data: ords, error: ordError } = await supabase
-                    .from('orders')
-                    .select('*')
-                    .order('created_at', { ascending: false })
-
+                // 2. Fetch Orders
+                const { data: ords } = await supabase.from('orders').select('*')
                 if (ords) {
-                    setOrders(ords)
-                    // Calculate basic stats
+                    setOrders(ords.slice(0, 5))
                     const totalRev = ords.reduce((acc, curr) => acc + (Number(curr.total_amount) || 0), 0)
                     setRevenue(totalRev)
                     setOrdersCount(ords.length)
                 }
 
-                // 3. Count AI messages (total)
-                const { count } = await supabase
-                    .from('messages')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('is_ai_generated', true)
+                // 3. Count AI & Customers
+                const { count: aiTotal } = await supabase.from('messages').select('*', { count: 'exact', head: true }).eq('is_ai_generated', true)
+                const { data: convs } = await supabase.from('conversations').select('id')
 
-                setAiCount(count || 0)
+                setAiCount(aiTotal || 0)
+                setCustomerCount(convs?.length || 0)
 
             } catch (error) {
                 console.error('Error fetching dashboard data:', error)
@@ -92,7 +86,6 @@ export default function DashboardPage() {
                 setLoading(false)
             }
         }
-
         fetchData()
     }, [])
 
@@ -100,19 +93,40 @@ export default function DashboardPage() {
         { label: 'Revenus (Est.)', value: `${revenue.toLocaleString()} FCFA`, change: '+0%', icon: TrendingUp, color: 'text-emerald-500 bg-emerald-500/10' },
         { label: 'Commandes', value: ordersCount.toString(), change: '+0%', icon: ShoppingBag, color: 'text-indigo-500 bg-indigo-500/10' },
         { label: 'Réponses IA', value: aiCount.toString(), change: 'Auto', icon: MessageSquare, color: 'text-purple-500 bg-purple-500/10' },
-        { label: 'Clients', value: '0', change: '--', icon: Users, color: 'text-blue-500 bg-blue-500/10' }, // Todo: Fetch distinct contacts
+        { label: 'Clients', value: customerCount.toString(), change: '--', icon: Users, color: 'text-blue-500 bg-blue-500/10' },
     ]
 
-    if (loading) {
-        return (
-            <div className="h-[50vh] flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-            </div>
-        )
-    }
+    if (loading) return <div className="h-[50vh] flex items-center justify-center"><Loader2 className="w-8 h-8 text-indigo-500 animate-spin" /></div>
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 pb-10">
+            {/* MOBILE ONLY WIDGET */}
+            <div className="block md:hidden">
+                <div className="p-6 rounded-[2rem] bg-gradient-to-br from-indigo-600 to-purple-800 text-white shadow-2xl relative overflow-hidden mb-6">
+                    <div className="relative z-10 flex flex-col gap-4">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <p className="text-indigo-100/70 text-xs font-medium mb-1 uppercase tracking-wider">Aujourd'hui</p>
+                                <h2 className="text-3xl font-black">VIBE Summary</h2>
+                            </div>
+                            <Badge className="bg-white/20 backdrop-blur-md border-0 text-[10px] font-bold">LIVE</Badge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 mt-2">
+                            <div className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/10">
+                                <p className="text-[10px] text-indigo-100/60 mb-1">Ventes</p>
+                                <p className="text-lg font-bold">+{revenue.toLocaleString()}</p>
+                            </div>
+                            <div className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/10">
+                                <p className="text-[10px] text-indigo-100/60 mb-1">Activité IA</p>
+                                <p className="text-lg font-bold">{aiCount} msg</p>
+                            </div>
+                        </div>
+                    </div>
+                    {/* Abstract shapes for premium feel */}
+                    <div className="absolute top-[-20%] right-[-10%] w-40 h-40 bg-white/5 rounded-full blur-3xl animate-pulse" />
+                    <div className="absolute bottom-[-20%] left-[-10%] w-40 h-40 bg-indigo-400/20 rounded-full blur-3xl" />
+                </div>
+            </div>
             {/* Bannière de Test de Déploiement */}
             <div className="bg-indigo-600/10 border border-indigo-500/20 p-4 rounded-xl mb-6">
                 <p className="text-indigo-400 font-bold text-center italic">🚀 VIBE VERSION 2.1 - PIPELINE DE DÉPLOIEMENT VALIDÉ</p>

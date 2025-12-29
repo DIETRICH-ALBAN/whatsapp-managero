@@ -51,6 +51,12 @@ const authMiddleware = (req, res, next) => {
 }
 
 app.get('/', (req, res) => res.json({ status: 'online', service: 'VIBE WhatsApp' }))
+app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString(), memory: process.memoryUsage() }))
+
+// Log de santé périodique
+setInterval(() => {
+    console.log(`[Health] Service actif - ${new Date().toISOString()} - Sockets: ${activeSockets.size}`)
+}, 600000) // Toutes les 10 minutes
 
 async function startSession(userId) {
     if (activeSockets.has(userId)) {
@@ -210,13 +216,28 @@ async function startSession(userId) {
                 console.log(`[Message] ${isGroup ? '(Groupe)' : '(Privé)'} ${contactName}: ${messageContent}`)
 
                 try {
+                    const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-managero.vercel.app'
+
                     // 1. Trouver ou créer la conversation
                     let { data: conversation } = await supabase
                         .from('conversations')
-                        .select('id, contact_name')
+                        .select('id, contact_name, agent_id, is_ai_enabled, unread_count')
                         .eq('user_id', userId)
                         .eq('contact_phone', senderNumber)
                         .single()
+
+                    // Analyse d'intention (seulement pour le texte privé)
+                    let analysis = null
+                    if (!isGroup && messageType === 'text') {
+                        try {
+                            const analyzeRes = await fetch(`${SITE_URL}/api/ai/analyze`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'x-api-secret': API_SECRET },
+                                body: JSON.stringify({ message: messageContent })
+                            })
+                            analysis = await analyzeRes.json()
+                        } catch (err) { console.error('[Analyze] Erreur:', err.message) }
+                    }
 
                     if (!conversation) {
                         const { data: newConvo } = await supabase
@@ -226,9 +247,12 @@ async function startSession(userId) {
                                 contact_phone: senderNumber,
                                 contact_name: contactName,
                                 last_message: messageContent,
-                                unread_count: 1
+                                unread_count: 1,
+                                intent_tag: analysis?.tag,
+                                priority_score: analysis?.priority || 0,
+                                summary: analysis?.summary
                             })
-                            .select('id')
+                            .select('id, contact_name, agent_id, is_ai_enabled, unread_count')
                             .single()
                         conversation = newConvo
                     } else {
@@ -239,7 +263,10 @@ async function startSession(userId) {
                                 contact_name: conversation.contact_name || contactName,
                                 last_message: messageContent,
                                 last_message_at: new Date().toISOString(),
-                                unread_count: (conversation.unread_count || 0) + 1
+                                unread_count: (conversation.unread_count || 0) + 1,
+                                intent_tag: analysis?.tag || undefined,
+                                priority_score: analysis?.priority || undefined,
+                                summary: analysis?.summary || undefined
                             })
                             .eq('id', conversation.id)
                     }
@@ -254,62 +281,64 @@ async function startSession(userId) {
                         status: 'received'
                     })
 
-                    // === AUTOMATISATION IA (UNIQUEMENT PRIVÉ) ===
-                    // 3. Vérifier si l'IA est activée pour cet utilisateur
-                    const { data: agentConfig } = await supabase
-                        .from('agent_configs')
-                        .select('*')
-                        .eq('user_id', userId)
-                        .single()
+                    // === AUTOMATISATION IA (UNIQUEMENT PRIVÉ & SI ACTIVÉ) ===
+                    if (!isGroup && conversation?.is_ai_enabled !== false && messageType === 'text') {
 
-                    if (!isGroup && agentConfig?.is_active && messageType === 'text') {
-                        console.log(`[IA] Agent actif pour ${userId}. Génération de réponse...`)
+                        // 3. Récupérer la config de l'agent (assigné ou par défaut)
+                        let agentConfig = null
+                        if (conversation?.agent_id) {
+                            const { data } = await supabase.from('agent_configs').select('*').eq('id', conversation.agent_id).single()
+                            agentConfig = data
+                        } else {
+                            const { data } = await supabase.from('agent_configs').select('*').eq('user_id', userId).eq('is_default', true).single()
+                            agentConfig = data
+                        }
 
-                        // Appeler l'API Vercel pour générer la réponse (on utilise fetch)
-                        // Note: On pourrait aussi le faire en local mais passer par Vercel centralise le cerveau
-                        const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-managero.vercel.app'
+                        if (agentConfig?.is_active) {
+                            console.log(`[IA] Agent "${agentConfig.name}" actif pour ${userId}.`)
 
-                        try {
-                            // On simule un délai de "frappe" pour faire plus humain
-                            await new Promise(resolve => setTimeout(resolve, 2000))
+                            try {
+                                // Simulation frappe
+                                await socket.sendPresenceUpdate('composing', jid)
+                                await new Promise(resolve => setTimeout(resolve, 3000))
 
-                            const aiResponse = await fetch(`${SITE_URL}/api/ai/chat`, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'x-api-secret': API_SECRET // Sécurité pour éviter les appels externes
-                                },
-                                body: JSON.stringify({
-                                    conversationId: conversation.id,
-                                    message: messageContent
-                                })
-                            })
-
-                            const aiData = await aiResponse.json()
-
-                            if (aiData.response) {
-                                // Envoyer la réponse sur WhatsApp
-                                await socket.sendMessage(jid, { text: aiData.response })
-                                console.log(`[IA] Réponse envoyée à ${senderNumber}`)
-
-                                // Enregistrer la réponse de l'IA dans Supabase
-                                await supabase.from('messages').insert({
-                                    conversation_id: conversation.id,
-                                    contact_phone: senderNumber,
-                                    content: aiData.response,
-                                    direction: 'outbound',
-                                    status: 'sent',
-                                    is_ai_generated: true
+                                const aiResponse = await fetch(`${SITE_URL}/api/ai/chat`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'x-api-secret': API_SECRET
+                                    },
+                                    body: JSON.stringify({
+                                        conversationId: conversation.id,
+                                        message: messageContent,
+                                        agentId: agentConfig.id // On passe l'ID de l'agent choisi
+                                    })
                                 })
 
-                                // Mettre à jour la conversation
-                                await supabase.from('conversations').update({
-                                    last_message: aiData.response,
-                                    last_message_at: new Date().toISOString()
-                                }).eq('id', conversation.id)
+                                const aiData = await aiResponse.json()
+
+                                if (aiData.response) {
+                                    await socket.sendMessage(jid, { text: aiData.response })
+                                    await socket.sendPresenceUpdate('paused', jid)
+
+                                    // Enregistrer réponse
+                                    await supabase.from('messages').insert({
+                                        conversation_id: conversation.id,
+                                        contact_phone: senderNumber,
+                                        content: aiData.response,
+                                        direction: 'outbound',
+                                        status: 'sent',
+                                        is_ai_generated: true
+                                    })
+
+                                    await supabase.from('conversations').update({
+                                        last_message: aiData.response,
+                                        last_message_at: new Date().toISOString()
+                                    }).eq('id', conversation.id)
+                                }
+                            } catch (aiErr) {
+                                console.error(`[IA] Erreur génération:`, aiErr.message)
                             }
-                        } catch (aiErr) {
-                            console.error(`[IA] Erreur génération:`, aiErr.message)
                         }
                     }
 

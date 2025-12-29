@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: 'VibeVendor - Assistant IA Commerce WhatsApp',
   description: 'Plateforme de gestion commerciale intelligente pour PME',
   keywords: ['WhatsApp', 'Business', 'CRM', 'Cameroun', 'PME'],
+  manifest: '/manifest.json',
 }
 
 import { ThemeProvider } from "@/components/theme-provider"
