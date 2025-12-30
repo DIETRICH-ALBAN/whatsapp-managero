@@ -46,6 +46,7 @@ const connectionStatus = new Map()
 const pairingCodes = new Map()
 const preferredMethod = new Map() // 'qr' ou 'code'
 const pendingPairing = new Map()
+const pairingCodeRequested = new Map() // Lock anti-boucle
 const sessionStartTimes = new Map() // Stocke le timestamp de connexion réussi
 
 const authMiddleware = (req, res, next) => {
