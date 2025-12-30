@@ -62,8 +62,30 @@ setInterval(() => {
 
 async function startSession(userId, phoneNumber = null) {
     preferredMethod.set(userId, phoneNumber ? 'code' : 'qr')
+
+    // Fonction helper pour générer le code
+    const triggerPairingCode = async (socket, phone) => {
+        if (!phone) return
+        qrCodes.delete(userId)
+        setTimeout(async () => {
+            try {
+                const cleanPhone = phone.replace(/\D/g, '')
+                console.log(`[Pairing] Demande code pour: ${cleanPhone}`)
+                const code = await socket.requestPairingCode(cleanPhone)
+                console.log(`[Pairing] Code reçu: ${code}`)
+                pairingCodes.set(userId, code)
+            } catch (err) {
+                console.error(`[Pairing] Erreur WhatsApp:`, err.message)
+            }
+        }, 1000)
+    }
+
     if (activeSockets.has(userId)) {
-        console.log(`[Session] Déjà active pour ${userId}`)
+        console.log(`[Session] Session existante pour ${userId}`)
+        const socket = activeSockets.get(userId)
+        if (phoneNumber && connectionStatus.get(userId) !== 'connected') {
+            await triggerPairingCode(socket, phoneNumber)
+        }
         return {
             status: connectionStatus.get(userId) || 'connecting',
             qrCode: qrCodes.get(userId),
@@ -332,17 +354,7 @@ async function startSession(userId, phoneNumber = null) {
 
         // Nouveau: Si un numéro est fourni, générer un code de couplage (Pairing Code)
         if (phoneNumber) {
-            qrCodes.delete(userId) // Suppression immédiate pour éviter les flashs de QR
-            setTimeout(async () => {
-                try {
-                    console.log(`[Pairing] Génération code pour ${phoneNumber}...`)
-                    const code = await socket.requestPairingCode(phoneNumber.replace(/[^0-9]/g, ''))
-                    console.log(`[Pairing] Code généré: ${code}`)
-                    pairingCodes.set(userId, code)
-                } catch (err) {
-                    console.error(`[Pairing] Erreur:`, err.message)
-                }
-            }, 1000) // Réduit à 1s
+            await triggerPairingCode(socket, phoneNumber)
         }
 
         return { status: 'connecting' }

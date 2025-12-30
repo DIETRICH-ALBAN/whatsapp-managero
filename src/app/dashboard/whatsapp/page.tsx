@@ -45,6 +45,13 @@ export default function WhatsAppPage() {
         checkStatus()
     }, [])
 
+    // Débloquer le bouton quand on reçoit une info
+    useEffect(() => {
+        if (state.qrCode || state.pairingCode || state.status === 'connected') {
+            setLoading(false)
+        }
+    }, [state])
+
     // Polling uniquement quand on attend une action ou qu'on est connecté
     useEffect(() => {
         let interval: NodeJS.Timeout
