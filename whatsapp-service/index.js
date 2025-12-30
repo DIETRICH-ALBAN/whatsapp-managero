@@ -42,7 +42,8 @@ app.use((req, res, next) => {
 const activeSockets = new Map()
 const qrCodes = new Map()
 const connectionStatus = new Map()
-const pairingCodes = new Map() // Nouveau
+const pairingCodes = new Map()
+const preferredMethod = new Map() // 'qr' ou 'code'
 
 const authMiddleware = (req, res, next) => {
     if (req.headers['x-api-secret'] !== API_SECRET) {
@@ -60,6 +61,7 @@ setInterval(() => {
 }, 600000) // Toutes les 10 minutes
 
 async function startSession(userId, phoneNumber = null) {
+    preferredMethod.set(userId, phoneNumber ? 'code' : 'qr')
     if (activeSockets.has(userId)) {
         console.log(`[Session] Déjà active pour ${userId}`)
         return {
@@ -129,7 +131,11 @@ async function startSession(userId, phoneNumber = null) {
                 console.log(`[QR] Nouveau code pour ${userId}`)
                 const qrData = await QRCode.toDataURL(qr)
                 qrCodes.set(userId, qrData)
-                pairingCodes.delete(userId)
+
+                // Si l'utilisateur a demandé un code, on ne le supprime pas au profit d'un QR automatique
+                if (preferredMethod.get(userId) === 'qr') {
+                    pairingCodes.delete(userId)
+                }
             }
 
             if (connection === 'open') {
@@ -353,9 +359,10 @@ app.post('/connect/:userId', authMiddleware, async (req, res) => {
 })
 
 app.get('/status/:userId', authMiddleware, (req, res) => {
+    const isCodeMode = preferredMethod.get(req.params.userId) === 'code'
     res.json({
         status: connectionStatus.get(req.params.userId) || 'disconnected',
-        qrCode: qrCodes.get(req.params.userId),
+        qrCode: isCodeMode ? null : qrCodes.get(req.params.userId),
         pairingCode: pairingCodes.get(req.params.userId),
         phoneNumber: activeSockets.get(req.params.userId)?.user?.id.split(':')[0]
     })

@@ -239,9 +239,9 @@ export default function WhatsAppPage() {
                                             <p className="text-slate-500 text-sm">Entrez ces caractères sur votre téléphone</p>
                                         </div>
 
-                                        <div className="flex gap-2">
+                                        <div className="grid grid-cols-4 sm:flex gap-2 px-2">
                                             {state.pairingCode.split('').map((char, i) => (
-                                                <div key={i} className="w-10 h-16 md:w-14 md:h-20 bg-indigo-500/10 border-2 border-indigo-500/30 rounded-2xl flex items-center justify-center text-3xl md:text-5xl font-black text-indigo-400 shadow-[0_0_30px_rgba(99,102,241,0.2)]">
+                                                <div key={i} className="w-12 h-16 md:w-14 md:h-20 bg-indigo-500/10 border-2 border-indigo-500/30 rounded-2xl flex items-center justify-center text-3xl md:text-5xl font-black text-indigo-400 shadow-[0_0_30px_rgba(99,102,241,0.2)]">
                                                     {char}
                                                 </div>
                                             ))}
