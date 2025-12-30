@@ -18,7 +18,9 @@ import {
     Keyboard,
     Info,
     ArrowRight,
-    XCircle
+    XCircle,
+    Copy,
+    Check
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -27,6 +29,7 @@ type ConnectionStatus = 'disconnected' | 'connecting' | 'connected'
 
 interface WhatsAppState {
     status: ConnectionStatus
+    method?: 'qr' | 'code'
     qrCode?: string
     pairingCode?: string
     phoneNumber?: string
@@ -39,6 +42,8 @@ export default function WhatsAppPage() {
     const [polling, setPolling] = useState(false)
     const [method, setMethod] = useState<'qr' | 'code'>('qr')
     const [phoneToPair, setPhoneToPair] = useState('')
+    const [lastUsedPhone, setLastUsedPhone] = useState('')
+    const [copied, setCopied] = useState(false)
 
     // Vérifier le statut au chargement
     useEffect(() => {
@@ -87,13 +92,15 @@ export default function WhatsAppPage() {
     const startConnection = async () => {
         if (method === 'code') {
             if (!phoneToPair) {
-                toast.error('Numéro requis', { description: 'Entrez votre numéro complet (ex: 237682...).' })
+                toast.error('Numéro requis', { description: 'Entrez votre numéro complet.' })
                 return
             }
-            if (phoneToPair.length < 10) {
-                toast.error('Numéro invalide', { description: 'Le numéro semble trop court. N\'oubliez pas l\'indicatif pays.' })
+            const clean = phoneToPair.replace(/\D/g, '')
+            if (clean.length < 8) {
+                toast.error('Numéro trop court', { description: 'Vérifiez l\'indicatif (ex: 237...).' })
                 return
             }
+            setLastUsedPhone(clean)
         }
 
         setLoading(true)
@@ -129,6 +136,7 @@ export default function WhatsAppPage() {
             await fetch('/api/whatsapp/connect', { method: 'DELETE' })
             setState({ status: 'disconnected' })
             setLoading(false)
+            setLastUsedPhone('')
             if (isCancel) {
                 toast.info('Connexion annulée')
             } else {
@@ -140,7 +148,13 @@ export default function WhatsAppPage() {
         }
     }
 
-    // Déterminer si on doit afficher le bouton principal
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+        toast.info('Code copié !')
+    }
+
     const showStartButton = state.status === 'disconnected' || (state.status === 'connecting' && !state.qrCode && !state.pairingCode);
 
     return (
@@ -225,7 +239,7 @@ export default function WhatsAppPage() {
                     {/* Content Display */}
                     <div className="min-h-[320px] flex flex-col items-center justify-center">
                         <AnimatePresence mode="wait">
-                            {/* ÉTATE : ATTENTE DE GÉNÉRATION */}
+                            {/* ÉTAT : ATTENTE DE GÉNÉRATION */}
                             {loading && state.status === 'connecting' && !state.qrCode && !state.pairingCode ? (
                                 <motion.div
                                     key="generating"
@@ -239,8 +253,8 @@ export default function WhatsAppPage() {
                                         </div>
                                     </div>
                                     <div className="text-center">
-                                        <h4 className="text-white font-bold text-xl">Génération du lien...</h4>
-                                        <p className="text-slate-500 text-sm mt-2">Veuillez patienter quelques secondes.</p>
+                                        <h4 className="text-white font-bold text-xl">Calcul du code...</h4>
+                                        <p className="text-slate-500 text-sm mt-2">WhatsApp valide votre numéro.</p>
                                     </div>
                                 </motion.div>
                             ) :
@@ -250,25 +264,34 @@ export default function WhatsAppPage() {
                                     <motion.div
                                         key="code-ready"
                                         initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-                                        className="flex flex-col items-center"
+                                        className="flex flex-col items-center w-full"
                                     >
                                         <div className="text-center mb-8">
-                                            <h4 className="text-white font-black text-2xl mb-1">Votre Code de Jumelage</h4>
-                                            <p className="text-slate-500 text-sm">Entrez ces caractères sur votre téléphone</p>
+                                            <h4 className="text-white font-black text-2xl mb-1">Votre Code</h4>
+                                            <p className="text-slate-500 text-sm">Prêt pour le numéro <span className="text-indigo-400 font-bold">+{lastUsedPhone}</span></p>
                                         </div>
 
-                                        <div className="grid grid-cols-4 sm:flex gap-2 px-2">
+                                        <div className="grid grid-cols-4 gap-3 md:flex md:gap-2 mb-8">
                                             {state.pairingCode.split('').map((char, i) => (
-                                                <div key={i} className="w-12 h-16 md:w-14 md:h-20 bg-indigo-500/10 border-2 border-indigo-500/30 rounded-2xl flex items-center justify-center text-3xl md:text-5xl font-black text-indigo-400 shadow-[0_0_30px_rgba(99,102,241,0.2)]">
+                                                <div key={i} className="w-14 h-16 md:w-16 md:h-20 bg-indigo-500/10 border-2 border-indigo-500/30 rounded-2xl flex items-center justify-center text-3xl md:text-5xl font-black text-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.2)]">
                                                     {char}
                                                 </div>
                                             ))}
                                         </div>
 
-                                        <div className="mt-12 bg-white/5 p-6 rounded-[2rem] border border-white/5 max-w-sm">
-                                            <div className="flex gap-4 text-sm text-slate-400 leading-relaxed">
-                                                <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center shrink-0 text-white font-bold">!</div>
-                                                <p>Sur <span className="text-white font-bold">WhatsApp</span> → <span className="text-indigo-400">Appareils connectés</span> → <span className="text-indigo-400">Lier un appareil</span> → <span className="text-white underline italic">Lier avec le numéro de téléphone</span></p>
+                                        <Button
+                                            onClick={() => copyToClipboard(state.pairingCode!)}
+                                            variant="outline"
+                                            className="mb-10 h-12 border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-400 rounded-xl"
+                                        >
+                                            {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+                                            {copied ? 'Copié' : 'Copier le code'}
+                                        </Button>
+
+                                        <div className="bg-white/5 p-6 rounded-[2rem] border border-white/5 max-w-sm w-full">
+                                            <div className="flex gap-4 text-xs text-slate-400 leading-relaxed">
+                                                <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center shrink-0 text-white font-bold">!</div>
+                                                <p>Sur votre mobile, entrez <span className="text-white font-bold">+{lastUsedPhone}</span> quand WhatsApp vous demande le numéro.</p>
                                             </div>
                                         </div>
                                     </motion.div>
@@ -286,7 +309,7 @@ export default function WhatsAppPage() {
                                             </div>
                                             <div className="mt-10 text-center">
                                                 <h4 className="text-white font-bold text-xl">Scannez le Code</h4>
-                                                <p className="text-slate-500 text-sm mt-2">Ouvrez WhatsApp sur votre PC/Mobile et scannez.</p>
+                                                <p className="text-slate-500 text-sm mt-2">Ouvrez WhatsApp et scannez ce QR.</p>
                                             </div>
                                         </motion.div>
                                     ) :
@@ -300,7 +323,7 @@ export default function WhatsAppPage() {
                                                 </div>
                                                 <h4 className="text-3xl font-black text-white">Prêt à l'emploi !</h4>
                                                 <p className="text-slate-500 text-center mt-4 max-w-xs leading-relaxed text-lg">
-                                                    Félicitations ! Votre agent IA est maintenant configuré et répondra à vos clients.
+                                                    Félicitations ! Votre agent IA est actif.
                                                 </p>
                                             </motion.div>
                                         ) : (
@@ -313,8 +336,8 @@ export default function WhatsAppPage() {
                                                             <div className="w-20 h-20 bg-indigo-600/10 rounded-[2rem] flex items-center justify-center mx-auto mb-6 border border-indigo-600/20">
                                                                 <Smartphone className="w-10 h-10 text-indigo-400" />
                                                             </div>
-                                                            <h4 className="text-white font-bold text-lg">Numéro de téléphone</h4>
-                                                            <p className="text-slate-500 text-sm mt-2 px-6 italic">Exemple : 237682449735</p>
+                                                            <h4 className="text-white font-bold text-lg">Lier via Numéro</h4>
+                                                            <p className="text-slate-500 text-sm mt-2 px-6">Entrez l'indicatif suivi du numéro.</p>
                                                         </div>
                                                         <div className="space-y-4">
                                                             <div className="relative">
@@ -322,14 +345,14 @@ export default function WhatsAppPage() {
                                                                     +
                                                                 </div>
                                                                 <Input
-                                                                    placeholder="Indicatif + Numéro"
+                                                                    placeholder="2376..."
                                                                     value={phoneToPair}
-                                                                    onChange={(e) => setPhoneToPair(e.target.value.replace(/[^\d+]/g, ''))}
-                                                                    className="h-16 pl-12 bg-white/5 border-white/10 rounded-2xl text-xl font-mono focus:border-indigo-500 focus:ring-indigo-500/20 text-white placeholder:text-slate-700 transition-all"
+                                                                    onChange={(e) => setPhoneToPair(e.target.value)}
+                                                                    className="h-16 pl-12 bg-white/5 border-white/10 rounded-2xl text-xl font-mono focus:border-indigo-500 focus:ring-indigo-500/20 text-white transition-all"
                                                                 />
                                                             </div>
                                                             <p className="text-[10px] text-center text-slate-500 uppercase tracking-widest font-bold">
-                                                                Ne pas mettre de parenthèses ou d'espaces
+                                                                Exemple: 237 6XX XXX XXX
                                                             </p>
                                                         </div>
                                                     </div>
@@ -338,8 +361,8 @@ export default function WhatsAppPage() {
                                                         <div className="w-24 h-24 rounded-[2.5rem] bg-indigo-600/10 border border-indigo-600/20 flex items-center justify-center mb-8 rotate-3 shadow-2xl">
                                                             <QrCode className="w-12 h-12 text-indigo-400" />
                                                         </div>
-                                                        <h4 className="text-white font-bold text-xl">Connexion Classique</h4>
-                                                        <p className="text-slate-500 text-sm mt-3 px-8">Recommandé pour configurer votre compte depuis un ordinateur.</p>
+                                                        <h4 className="text-white font-bold text-xl">Lier via QR Code</h4>
+                                                        <p className="text-slate-500 text-sm mt-3 px-8">Privilégiez cette méthode sur ordinateur.</p>
                                                     </div>
                                                 )}
                                             </motion.div>
@@ -367,61 +390,45 @@ export default function WhatsAppPage() {
                         {state.status === 'connecting' && (state.qrCode || state.pairingCode || loading) && (
                             <div className="flex flex-col gap-3">
                                 <Button
-                                    onClick={() => {
-                                        setLoading(false);
-                                        startConnection();
-                                    }}
+                                    onClick={() => startConnection()}
                                     variant="outline"
                                     className="h-14 border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-400 rounded-[1.5rem] font-bold"
                                 >
                                     <RefreshCw className={cn("w-5 h-5 mr-3", loading && "animate-spin")} />
-                                    Régénérer
+                                    Régénérer le code
                                 </Button>
                                 <Button
                                     onClick={() => disconnect(true)}
                                     variant="ghost"
-                                    className="h-14 text-slate-500 hover:text-red-400 hover:bg-red-500/5 rounded-[1.5rem] font-bold transition-colors"
+                                    className="h-14 text-slate-500 hover:text-red-400 hover:bg-red-500/5 rounded-[1.5rem] font-bold"
                                 >
                                     <XCircle className="w-5 h-5 mr-3" />
-                                    Annuler la procédure
+                                    Annuler et réinitialiser
                                 </Button>
                             </div>
-                        )}
-
-                        {state.status === 'connected' && (
-                            <Button
-                                onClick={() => disconnect(false)}
-                                variant="outline"
-                                className="h-14 border-red-500/30 text-red-500 hover:bg-red-500/10 rounded-[1.5rem] font-bold"
-                            >
-                                <Unplug className="w-5 h-5 mr-3" />
-                                Déconnecter cet appareil
-                            </Button>
                         )}
                     </div>
                 </div>
             </Card>
 
-            {/* Steps & Info */}
-            <div className="grid md:grid-cols-2 gap-6 pb-12">
-                <Card className="p-8 border-white/5 bg-[#0D0D12]/30 rounded-[2rem] backdrop-blur-xl">
-                    <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-3">
-                        <Info className="w-5 h-5 text-indigo-400" />
-                        Conseil Mobile
+            {/* Info Cards */}
+            <div className="grid md:grid-cols-2 gap-4">
+                <Card className="p-6 border-white/5 bg-white/5 rounded-3xl">
+                    <h3 className="text-white font-bold mb-2 flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        Numéro envoyé
                     </h3>
-                    <p className="text-sm text-slate-500 leading-relaxed">
-                        Si vous naviguez sur votre téléphone, le <span className="text-indigo-400 font-bold italic underline">Code Appareil</span> est la méthode la plus simple.
-                        Copiez simplement le code et saisissez-le dans WhatsApp.
+                    <p className="text-sm text-slate-400">
+                        {lastUsedPhone ? `Le code a été généré pour le numéro : +${lastUsedPhone}` : "Aucun numéro envoyé pour l'instant."}
                     </p>
                 </Card>
-
-                <Card className="p-8 border-white/5 bg-[#0D0D12]/30 rounded-[2rem] backdrop-blur-xl">
-                    <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-3">
-                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                        Aide Numéro
+                <Card className="p-6 border-white/5 bg-white/5 rounded-3xl">
+                    <h3 className="text-white font-bold mb-2 flex items-center gap-2">
+                        <Info className="w-4 h-4 text-indigo-400" />
+                        Aide Connexion
                     </h3>
-                    <p className="text-sm text-slate-500 leading-relaxed">
-                        Le numéro doit être entré avec son indicatif international. Pour le Cameroun par exemple, commencez par <span className="text-white font-bold">237</span> suivi de votre numéro à 9 chiffres.
+                    <p className="text-xs text-slate-400">
+                        Si WhatsApp rejette le numéro, vérifiez qu'il est identique à celui du formulaire.
                     </p>
                 </Card>
             </div>

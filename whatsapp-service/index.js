@@ -150,14 +150,10 @@ async function startSession(userId, phoneNumber = null) {
         socket.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update
             if (qr) {
-                console.log(`[QR] Nouveau code pour ${userId}`)
+                console.log(`[QR] Nouveau signal reçu pour ${userId}`)
                 const qrData = await QRCode.toDataURL(qr)
                 qrCodes.set(userId, qrData)
-
-                // Si l'utilisateur a demandé un code, on ne le supprime pas au profit d'un QR automatique
-                if (preferredMethod.get(userId) === 'qr') {
-                    pairingCodes.delete(userId)
-                }
+                // On ne touche plus à pairingCodes ici pour éviter la disparition éclair
             }
 
             if (connection === 'open') {
@@ -371,10 +367,11 @@ app.post('/connect/:userId', authMiddleware, async (req, res) => {
 })
 
 app.get('/status/:userId', authMiddleware, (req, res) => {
-    const isCodeMode = preferredMethod.get(req.params.userId) === 'code'
+    const method = preferredMethod.get(req.params.userId) || 'qr'
     res.json({
         status: connectionStatus.get(req.params.userId) || 'disconnected',
-        qrCode: isCodeMode ? null : qrCodes.get(req.params.userId),
+        method: method,
+        qrCode: method === 'code' ? null : qrCodes.get(req.params.userId),
         pairingCode: pairingCodes.get(req.params.userId),
         phoneNumber: activeSockets.get(req.params.userId)?.user?.id.split(':')[0]
     })
