@@ -57,9 +57,9 @@ export function Header({ user }: { user: any }) {
     return (
         <header className="h-16 flex items-center justify-between px-4 md:px-8 bg-background/80 backdrop-blur-md border-b border-border sticky top-0 z-30">
 
-            {/* Logo Mobile Only */}
-            <div className="md:hidden flex items-center pr-2">
-                <Logo iconOnly size="sm" href="/dashboard" />
+            {/* Logo Mobile */}
+            <div className="md:hidden flex items-center pr-4">
+                <Logo size="sm" href="/dashboard" />
             </div>
 
             {/* Search Bar */}
