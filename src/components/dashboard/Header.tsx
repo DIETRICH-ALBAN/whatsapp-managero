@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { Logo } from '@/components/ui/logo'
 
 export function Header({ user }: { user: any }) {
     const router = useRouter()
@@ -55,6 +56,11 @@ export function Header({ user }: { user: any }) {
 
     return (
         <header className="h-16 flex items-center justify-between px-4 md:px-8 bg-background/80 backdrop-blur-md border-b border-border sticky top-0 z-30">
+
+            {/* Logo Mobile Only */}
+            <div className="md:hidden flex items-center pr-2">
+                <Logo iconOnly size="sm" href="/dashboard" />
+            </div>
 
             {/* Search Bar */}
             <div className="flex-1 max-w-md relative hidden md:block">

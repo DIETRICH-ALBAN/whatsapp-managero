@@ -2,14 +2,16 @@
 
 import Link from 'next/link'
 import { MessageCircle } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface LogoProps {
     size?: 'sm' | 'md' | 'lg'
     href?: string
     className?: string
+    iconOnly?: boolean
 }
 
-export function Logo({ size = 'md', href = '/', className = '' }: LogoProps) {
+export function Logo({ size = 'md', href = '/', className = '', iconOnly = false }: LogoProps) {
     const sizes = {
         sm: { icon: 28, text: 'text-lg', bubble: 10 },
         md: { icon: 36, text: 'text-xl', bubble: 12 },
@@ -19,7 +21,7 @@ export function Logo({ size = 'md', href = '/', className = '' }: LogoProps) {
     const s = sizes[size]
 
     const LogoContent = (
-        <div className={`flex items-center gap-2 ${className}`}>
+        <div className={cn("flex items-center gap-2", className)}>
             {/* Icon: Stylized W with chat bubble */}
             <div className="relative">
                 {/* The W Shape */}
@@ -66,10 +68,12 @@ export function Logo({ size = 'md', href = '/', className = '' }: LogoProps) {
             </div>
 
             {/* Text: vibevendor */}
-            <span className={`font-bold tracking-tight ${s.text}`}>
-                <span className="text-foreground">vibe</span>
-                <span className="text-indigo-500">vendor</span>
-            </span>
+            {!iconOnly && (
+                <span className={cn("font-bold tracking-tight", s.text)}>
+                    <span className="text-foreground">vibe</span>
+                    <span className="text-indigo-500">vendor</span>
+                </span>
+            )}
         </div>
     )
 

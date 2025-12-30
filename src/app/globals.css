@@ -104,9 +104,9 @@ html {
   --foreground: #ffffff;
   --foreground-muted: #94a3b8;
   --border: #1e293b;
-  --card-bg: rgba(15, 23, 42, 0.6);
+  --card-bg: rgba(9, 9, 11, 0.98);
   --card-foreground: #ffffff;
-  --popover: #020617;
+  --popover: #050507;
   --popover-foreground: #ffffff;
   --muted: #1e293b;
   --muted-foreground: #94a3b8;
@@ -114,6 +114,17 @@ html {
   --destructive-foreground: #ffffff;
   --input: #1e293b;
   --ring: #8b5cf6;
+}
+
+/* Styles pour les Popups/Menus interactifs */
+[role="menu"],
+[role="listbox"],
+[role="dialog"],
+[data-radix-popper-content-wrapper]>div {
+  background-color: #09090b !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5) !important;
 }
 
 @theme inline {
