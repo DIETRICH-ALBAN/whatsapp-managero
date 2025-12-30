@@ -35,7 +35,7 @@ app.use(cors())
 app.use(express.json())
 
 app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`)
+    if (req.url !== '/health') console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`)
     next()
 })
 
@@ -58,16 +58,17 @@ app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISO
 
 // Log de santé périodique
 setInterval(() => {
-    console.log(`[Health] Service actif - ${new Date().toISOString()} - Sockets: ${activeSockets.size}`)
-}, 600000) // Toutes les 10 minutes
+    console.log(`[Health] Service actif - Sockets: ${activeSockets.size}`)
+}, 600000)
 
 async function startSession(userId, phoneNumber = null) {
     const isCodeMode = !!phoneNumber
     preferredMethod.set(userId, isCodeMode ? 'code' : 'qr')
 
-    // Reset systématique pour éviter les résidus d'anciennes tentatives
+    // Reset immédiat des états d'affichage
     qrCodes.delete(userId)
     pairingCodes.delete(userId)
+
     if (isCodeMode) {
         pendingPairing.set(userId, phoneNumber.replace(/\D/g, ''))
     } else {
@@ -77,17 +78,19 @@ async function startSession(userId, phoneNumber = null) {
     const sessionDir = path.join(__dirname, 'sessions')
     const sessionPath = path.join(sessionDir, userId)
 
-    // SÉCURITÉ : Si on demande un nouveau code, on DOIT supprimer l'ancienne session locale
-    // sinon Baileys s'embrouille entre l'ancien état et le nouveau.
-    if (phoneNumber && fs.existsSync(sessionPath)) {
-        console.log(`[Session] Nettoyage session pour fresh pairing: ${userId}`)
+    // FORCE RESET : Si on demande une nouvelle connexion (non connectée)
+    if (activeSockets.has(userId) && connectionStatus.get(userId) !== 'connected') {
+        console.log(`[Session] Reset socket pour rafraîchir QR/Code: ${userId}`)
         try {
-            if (activeSockets.has(userId)) {
-                try { activeSockets.get(userId).end(undefined) } catch (e) { }
-                activeSockets.delete(userId)
-            }
-            fs.rmSync(sessionPath, { recursive: true, force: true })
-        } catch (e) { console.error("Erreur nettoyage:", e.message) }
+            activeSockets.get(userId).end(undefined)
+            activeSockets.delete(userId)
+        } catch (e) { }
+    }
+
+    // Si on demande un nouveau Pairing Code, on force le nettoyage du dossier session
+    if (isCodeMode && fs.existsSync(sessionPath)) {
+        console.log(`[Pairing] Fresh restart session folder for ${userId}`)
+        try { fs.rmSync(sessionPath, { recursive: true, force: true }) } catch (e) { }
     }
 
     if (activeSockets.has(userId)) {
@@ -99,23 +102,16 @@ async function startSession(userId, phoneNumber = null) {
     }
 
     try {
-        console.log(`[Session] Démarrage... ${userId} (Mode: ${phoneNumber ? 'CODE' : 'QR'})`)
+        console.log(`[Session] Initialisation ${userId} (${isCodeMode ? 'CODE' : 'QR'})`)
         const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
         if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true })
 
-        // 1. Restaurer depuis Supabase si le dossier est vide
-        if (!fs.existsSync(path.join(sessionPath, 'creds.json'))) {
-            console.log(`[Session] Restauration depuis Supabase pour ${userId}...`)
-            const { data: session } = await supabase
-                .from('whatsapp_sessions')
-                .select('creds')
-                .eq('user_id', userId)
-                .single()
-
+        // Restauration uniquement pour QR classique
+        if (!isCodeMode && !fs.existsSync(path.join(sessionPath, 'creds.json'))) {
+            const { data: session } = await supabase.from('whatsapp_sessions').select('creds').eq('user_id', userId).single()
             if (session?.creds) {
                 if (!fs.existsSync(sessionPath)) fs.mkdirSync(sessionPath, { recursive: true })
                 fs.writeFileSync(path.join(sessionPath, 'creds.json'), session.creds)
-                console.log(`[Session] Creds restaurés avec succès`)
             }
         }
 
@@ -125,12 +121,13 @@ async function startSession(userId, phoneNumber = null) {
         const socketConfig = {
             version,
             auth: state,
-            browser: ['VibeVendor', 'Chrome', '1.0.0'],
-            logger: pino({ level: 'info' }),
+            // Signature importante pour la compatibilité Pairing Code
+            browser: ['Mac OS', 'Safari', '110.0.5481.100'],
+            logger: pino({ level: 'silent' }),
+            printQRInTerminal: false,
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 0,
-            keepAliveIntervalMs: 10000,
-            generateHighQualityLinkPreview: true
+            keepAliveIntervalMs: 10000
         }
 
         const socket = makeWASocket.default ? makeWASocket.default(socketConfig) : makeWASocket(socketConfig)
@@ -141,31 +138,34 @@ async function startSession(userId, phoneNumber = null) {
         socket.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update
 
-            // LOGIQUE DE SYNCHRONISATION PARFAITE
             if (qr) {
                 const phone = pendingPairing.get(userId)
                 if (phone) {
-                    console.log(`[Pairing] Signal QR intercepté. Demande du code pour ${phone}...`)
+                    console.log(`[Pairing] Signal QR intercepté. Demande code pour ${phone}...`)
                     try {
                         const code = await socket.requestPairingCode(phone)
-                        console.log(`[Pairing] Code REÇU de WhatsApp: ${code}`)
+                        console.log(`[Pairing] SUCCÈS Code: ${code}`)
                         pairingCodes.set(userId, code)
-                        pendingPairing.delete(userId) // Satisfait
+                        qrCodes.delete(userId)
+                        pendingPairing.delete(userId)
                     } catch (err) {
-                        console.error(`[Pairing] Échec critique:`, err.message)
+                        console.error(`[Pairing] Échec:`, err.message)
                         pairingCodes.set(userId, "ERREUR")
                     }
                 } else {
+                    console.log(`[QR] Image générée pour ${userId}`)
                     const qrData = await QRCode.toDataURL(qr)
                     qrCodes.set(userId, qrData)
+                    pairingCodes.delete(userId)
                 }
             }
 
             if (connection === 'open') {
-                console.log(`[Connexion] Succès pour ${userId}`)
+                console.log(`[Connexion] Connecté ! ${userId}`)
                 connectionStatus.set(userId, 'connected')
                 qrCodes.delete(userId)
                 pairingCodes.delete(userId)
+                pendingPairing.delete(userId)
 
                 await supabase.from('whatsapp_sessions').upsert({
                     user_id: userId,
@@ -176,17 +176,15 @@ async function startSession(userId, phoneNumber = null) {
             }
 
             if (connection === 'close') {
-                const shouldReconnect = (lastDisconnect?.error instanceof Boom)
-                    ? lastDisconnect.error.output?.statusCode !== DisconnectReason.loggedOut
-                    : true
+                const errorCode = (lastDisconnect?.error instanceof Boom) ? lastDisconnect.error.output?.statusCode : 0
+                const shouldReconnect = errorCode !== DisconnectReason.loggedOut
+
+                console.log(`[Connexion] Fermée (${errorCode}). Reconnexion: ${shouldReconnect}`)
 
                 activeSockets.delete(userId)
                 connectionStatus.set(userId, 'disconnected')
-                qrCodes.delete(userId)
-                pairingCodes.delete(userId)
 
                 if (shouldReconnect) {
-                    console.log(`[Connexion] Reconnexion automatique pour ${userId} dans 5s...`)
                     setTimeout(() => startSession(userId), 5000)
                 }
             }
@@ -202,154 +200,64 @@ async function startSession(userId, phoneNumber = null) {
                     is_connected: connectionStatus.get(userId) === 'connected',
                     updated_at: new Date().toISOString()
                 })
-            } catch (err) {
-                console.error(`[Session] Erreur sauvegarde Supabase:`, err.message)
-            }
+            } catch (err) { }
         })
 
-        // === ÉCOUTE DES MESSAGES ENTRANTS ===
         socket.ev.on('messages.upsert', async (m) => {
             const messages = m.messages
             for (const msg of messages) {
                 if (msg.key.fromMe || msg.key.remoteJid === 'status@broadcast') continue
 
                 const jid = msg.key.remoteJid
-                const isGroup = jid.endsWith('@g.us')
                 const senderNumber = jid.split('@')[0]
                 const contactName = msg.pushName || senderNumber
 
-                let messageContent = ''
-                let messageType = 'text'
-
-                if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
-                    messageContent = msg.message?.conversation || msg.message?.extendedTextMessage?.text
-                } else if (msg.message?.imageMessage) {
-                    messageContent = '📷 Photo'
-                    messageType = 'image'
-                } else if (msg.message?.videoMessage) {
-                    messageContent = '🎥 Vidéo'
-                    messageType = 'video'
-                } else if (msg.message?.audioMessage) {
-                    messageContent = '🎵 Audio'
-                    messageType = 'audio'
-                } else if (msg.message?.documentMessage) {
-                    messageContent = '📄 Document'
-                    messageType = 'document'
-                } else {
-                    messageContent = '[Média]'
-                    messageType = 'other'
-                }
-
-                if (!messageContent) continue
-                console.log(`[Message] ${isGroup ? '(Groupe)' : '(Privé)'} ${contactName}: ${messageContent}`)
+                let messageContent = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '[Média]'
+                if (!messageContent || messageContent === '[Média]') continue
 
                 try {
                     const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-managero.vercel.app'
 
-                    // 1. Trouver ou créer la conversation
-                    let { data: conversation } = await supabase
-                        .from('conversations')
-                        .select('id, contact_name, agent_id, is_ai_enabled, unread_count')
-                        .eq('user_id', userId)
-                        .eq('contact_phone', senderNumber)
-                        .single()
-
-                    // Analyse d'intention (IA)
-                    let analysis = null
-                    if (!isGroup && messageType === 'text') {
-                        try {
-                            const analyzeRes = await fetch(`${SITE_URL}/api/ai/analyze`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'x-api-secret': API_SECRET },
-                                body: JSON.stringify({ message: messageContent })
-                            })
-                            analysis = await analyzeRes.json()
-                        } catch (err) { console.error('[Analyze] Erreur:', err.message) }
-                    }
+                    let { data: conversation } = await supabase.from('conversations')
+                        .select('*').eq('user_id', userId).eq('contact_phone', senderNumber).single()
 
                     if (!conversation) {
-                        const { data: newConvo } = await supabase
-                            .from('conversations')
-                            .insert({
-                                user_id: userId,
-                                contact_phone: senderNumber,
-                                contact_name: contactName,
-                                last_message: messageContent,
-                                last_message_at: new Date().toISOString(),
-                                unread_count: 1,
-                                intent_tag: analysis?.intent || null,
-                                agent_id: analysis?.suggestedAgentId || null
-                            })
-                            .select()
-                            .single()
-                        conversation = newConvo
+                        const { data: newC } = await supabase.from('conversations').insert({
+                            user_id: userId, contact_phone: senderNumber, contact_name: contactName,
+                            last_message: messageContent, last_message_at: new Date().toISOString(), unread_count: 1
+                        }).select().single()
+                        conversation = newC
                     } else {
                         await supabase.from('conversations').update({
-                            last_message: messageContent,
-                            last_message_at: new Date().toISOString(),
-                            unread_count: (conversation.unread_count || 0) + 1,
-                            intent_tag: analysis?.intent || conversation.intent_tag,
-                            agent_id: analysis?.suggestedAgentId || conversation.agent_id
+                            last_message: messageContent, last_message_at: new Date().toISOString(),
+                            unread_count: (conversation.unread_count || 0) + 1
                         }).eq('id', conversation.id)
                     }
 
-                    // 2. Enregistrer le message
                     await supabase.from('messages').insert({
-                        conversation_id: conversation.id,
-                        contact_phone: senderNumber,
-                        content: messageContent,
-                        direction: 'inbound',
-                        status: 'received',
-                        message_type: messageType
+                        conversation_id: conversation.id, contact_phone: senderNumber,
+                        content: messageContent, direction: 'inbound', status: 'received'
                     })
 
-                    // 3. IA : Répondre si activé
-                    if (!isGroup && conversation && (conversation.is_ai_enabled)) {
-                        const agentId = conversation.agent_id
-                        const { data: agentConfig } = await supabase
-                            .from('agent_configs')
-                            .select('*')
-                            .eq('id', agentId)
-                            .single()
-
-                        if (agentConfig?.is_active) {
-                            try {
-                                await socket.sendPresenceUpdate('composing', jid)
-                                await new Promise(resolve => setTimeout(resolve, 3000))
-
-                                const aiResponse = await fetch(`${SITE_URL}/api/ai/chat`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json', 'x-api-secret': API_SECRET },
-                                    body: JSON.stringify({
-                                        conversationId: conversation.id,
-                                        message: messageContent,
-                                        agentId: agentConfig.id
-                                    })
+                    if (conversation.is_ai_enabled && conversation.agent_id) {
+                        try {
+                            await socket.sendPresenceUpdate('composing', jid)
+                            const aiRes = await fetch(`${SITE_URL}/api/ai/chat`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'x-api-secret': API_SECRET },
+                                body: JSON.stringify({ conversationId: conversation.id, message: messageContent, agentId: conversation.agent_id })
+                            })
+                            const aiData = await aiRes.json()
+                            if (aiData.response) {
+                                await socket.sendMessage(jid, { text: aiData.response })
+                                await supabase.from('messages').insert({
+                                    conversation_id: conversation.id, contact_phone: senderNumber,
+                                    content: aiData.response, direction: 'outbound', status: 'sent', is_ai_generated: true
                                 })
-
-                                const aiData = await aiResponse.json()
-                                if (aiData.response) {
-                                    await socket.sendMessage(jid, { text: aiData.response })
-                                    await socket.sendPresenceUpdate('paused', jid)
-
-                                    await supabase.from('messages').insert({
-                                        conversation_id: conversation.id,
-                                        contact_phone: senderNumber,
-                                        content: aiData.response,
-                                        direction: 'outbound',
-                                        status: 'sent',
-                                        is_ai_generated: true
-                                    })
-
-                                    await supabase.from('conversations').update({
-                                        last_message: aiData.response,
-                                        last_message_at: new Date().toISOString()
-                                    }).eq('id', conversation.id)
-                                }
-                            } catch (aiErr) { console.error(`[IA] Erreur:`, aiErr.message) }
-                        }
+                            }
+                        } catch (e) { }
                     }
-                } catch (dbError) { console.error(`[DB] Erreur:`, dbError.message) }
+                } catch (e) { }
             }
         })
 
@@ -360,64 +268,31 @@ async function startSession(userId, phoneNumber = null) {
     }
 }
 
-// === ROUTES API ===
 app.post('/connect/:userId', authMiddleware, async (req, res) => {
-    const { phoneNumber } = req.body
-    res.json(await startSession(req.params.userId, phoneNumber))
+    res.json(await startSession(req.params.userId, req.body.phoneNumber))
 })
 
 app.get('/status/:userId', authMiddleware, (req, res) => {
-    const method = preferredMethod.get(req.params.userId) || 'qr'
-    res.json({
-        status: connectionStatus.get(req.params.userId) || 'disconnected',
-        method: method,
-        qrCode: method === 'code' ? null : qrCodes.get(req.params.userId),
-        pairingCode: pairingCodes.get(req.params.userId),
-        phoneNumber: activeSockets.get(req.params.userId)?.user?.id.split(':')[0]
-    })
-})
-
-app.get('/debug/:userId', authMiddleware, (req, res) => {
     const userId = req.params.userId
     res.json({
-        hasSocket: activeSockets.has(userId),
-        status: connectionStatus.get(userId),
-        hasQr: !!qrCodes.get(userId),
-        hasPairingCode: !!pairingCodes.get(userId),
-        sessionExists: fs.existsSync(path.join(__dirname, 'sessions', userId))
+        status: connectionStatus.get(userId) || 'disconnected',
+        method: preferredMethod.get(userId) || 'qr',
+        qrCode: qrCodes.get(userId),
+        pairingCode: pairingCodes.get(userId),
+        phoneNumber: activeSockets.get(userId)?.user?.id.split(':')[0]
     })
 })
 
 app.delete('/disconnect/:userId', authMiddleware, async (req, res) => {
     const userId = req.params.userId
-    const socket = activeSockets.get(userId)
-    if (socket) {
-        try { await socket.logout() } catch (e) { }
+    if (activeSockets.has(userId)) {
+        try { await activeSockets.get(userId).logout() } catch (e) { }
         activeSockets.delete(userId)
-        connectionStatus.set(userId, 'disconnected')
     }
-    // Nettoyage complet
+    connectionStatus.set(userId, 'disconnected')
     qrCodes.delete(userId)
     pairingCodes.delete(userId)
-    preferredMethod.delete(userId)
-
     res.json({ success: true })
-})
-
-app.post('/send/:userId', authMiddleware, async (req, res) => {
-    const { userId } = req.params
-    const { phoneNumber, message } = req.body
-
-    const socket = activeSockets.get(userId)
-    if (!socket) return res.status(400).json({ error: 'WhatsApp non connecté' })
-
-    try {
-        const jid = phoneNumber.includes('@') ? phoneNumber : `${phoneNumber}@s.whatsapp.net`
-        await socket.sendMessage(jid, { text: message })
-        res.json({ success: true })
-    } catch (error) {
-        res.status(500).json({ error: 'Échec envoi', details: error.message })
-    }
 })
 
 app.listen(PORT, HOST, () => console.log(`🚀 Microservice prêt sur ${PORT}`))
