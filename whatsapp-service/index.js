@@ -326,17 +326,17 @@ async function startSession(userId, phoneNumber = null) {
 
         // Nouveau: Si un numéro est fourni, générer un code de couplage (Pairing Code)
         if (phoneNumber) {
+            qrCodes.delete(userId) // Suppression immédiate pour éviter les flashs de QR
             setTimeout(async () => {
                 try {
                     console.log(`[Pairing] Génération code pour ${phoneNumber}...`)
                     const code = await socket.requestPairingCode(phoneNumber.replace(/[^0-9]/g, ''))
                     console.log(`[Pairing] Code généré: ${code}`)
                     pairingCodes.set(userId, code)
-                    qrCodes.delete(userId)
                 } catch (err) {
                     console.error(`[Pairing] Erreur:`, err.message)
                 }
-            }, 5000)
+            }, 1000) // Réduit à 1s
         }
 
         return { status: 'connecting' }

@@ -50,7 +50,7 @@ export default function WhatsAppPage() {
 
         if (state.status === 'connecting' || state.status === 'connected') {
             setPolling(true)
-            interval = setInterval(checkStatus, 3000)
+            interval = setInterval(checkStatus, 1500) // Récupération plus rapide (1.5s au lieu de 3s)
         } else {
             setPolling(false)
         }
