@@ -66,25 +66,30 @@ async function startSession(userId, phoneNumber = null) {
     // Fonction helper pour générer le code
     const triggerPairingCode = async (socket, phone) => {
         if (!phone) return
+        const cleanPhone = phone.replace(/\D/g, '')
+        console.log(`[Pairing] Démarrage génération pour: ${cleanPhone}`)
+
+        // On vide les anciens codes pour forcer le frontend à voir le chargement
         qrCodes.delete(userId)
-        setTimeout(async () => {
-            try {
-                const cleanPhone = phone.replace(/\D/g, '')
-                console.log(`[Pairing] Demande code pour: ${cleanPhone}`)
-                const code = await socket.requestPairingCode(cleanPhone)
-                console.log(`[Pairing] Code reçu: ${code}`)
-                pairingCodes.set(userId, code)
-            } catch (err) {
-                console.error(`[Pairing] Erreur WhatsApp:`, err.message)
-            }
-        }, 1000)
+        pairingCodes.delete(userId)
+
+        try {
+            // Un petit délai est nécessaire pour que le socket Baileys soit prêt à générer
+            await new Promise(resolve => setTimeout(resolve, 1500))
+            const code = await socket.requestPairingCode(cleanPhone)
+            console.log(`[Pairing] Code généré avec succès: ${code}`)
+            pairingCodes.set(userId, code)
+        } catch (err) {
+            console.error(`[Pairing] ERREUR FATALE Baileys:`, err.message)
+            pairingCodes.set(userId, "ERREUR") // Signal d'erreur au frontend
+        }
     }
 
     if (activeSockets.has(userId)) {
-        console.log(`[Session] Session existante pour ${userId}`)
         const socket = activeSockets.get(userId)
         if (phoneNumber && connectionStatus.get(userId) !== 'connected') {
-            await triggerPairingCode(socket, phoneNumber)
+            console.log(`[Session] Régénération code pour session existante ${userId}`)
+            triggerPairingCode(socket, phoneNumber) // On lance en tâche de fond
         }
         return {
             status: connectionStatus.get(userId) || 'connecting',
