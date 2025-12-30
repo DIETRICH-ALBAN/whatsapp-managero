@@ -141,7 +141,7 @@ export default function DashboardPage() {
                     <Button
                         variant="outline"
                         className="rounded-full"
-                        onClick={() => toast.success("Export en cours...", { description: "Le rapport sera envoyé par email." })}
+                        onClick={handleExport}
                     >
                         Exporter
                     </Button>
@@ -162,18 +162,17 @@ export default function DashboardPage() {
                                 </div>
                                 <DialogTitle className="text-2xl text-white">Nouveau Message</DialogTitle>
                                 <DialogDescription className="text-slate-400 text-base">
-                                    Envoyez une notification WhatsApp ou démarrez une conversation.
+                                    Envoyez directement sur WhatsApp.
                                 </DialogDescription>
                             </DialogHeader>
 
                             <div className="p-8 pt-2 space-y-6">
                                 <div className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="phone" className="text-slate-300 font-medium">Numéro de téléphone</Label>
+                                        <Label className="text-slate-300 font-medium">Numéro de téléphone</Label>
                                         <div className="relative">
                                             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-sm">+237</div>
                                             <Input
-                                                id="phone"
                                                 placeholder="6 00 00 00 00"
                                                 className="pl-14 bg-white/5 border-white/10 hover:border-white/20 focus:border-indigo-500 transition-colors h-12 text-lg rounded-xl text-white placeholder:text-slate-600"
                                                 value={newMessagePhone}
@@ -183,10 +182,9 @@ export default function DashboardPage() {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="message" className="text-slate-300 font-medium">Votre message</Label>
+                                        <Label className="text-slate-300 font-medium">Votre message</Label>
                                         <Textarea
-                                            id="message"
-                                            placeholder="Bonjour, votre commande est prête..."
+                                            placeholder="Bonjour..."
                                             className="bg-white/5 border-white/10 hover:border-white/20 focus:border-indigo-500 transition-colors min-h-[140px] p-4 text-base rounded-xl text-white placeholder:text-slate-600 resize-none"
                                             value={newMessageContent}
                                             onChange={(e) => setNewMessageContent(e.target.value)}
@@ -203,23 +201,7 @@ export default function DashboardPage() {
                                         Annuler
                                     </Button>
                                     <Button
-                                        onClick={async () => {
-                                            setSending(true)
-                                            await new Promise(resolve => setTimeout(resolve, 1000))
-                                            const supabase = createClient()
-                                            await supabase.from('messages').insert({
-                                                contact_phone: newMessagePhone,
-                                                content: newMessageContent,
-                                                direction: 'outbound',
-                                                status: 'new',
-                                                platform: 'whatsapp'
-                                            })
-                                            toast.success("Message envoyé !")
-                                            setSending(false)
-                                            setIsNewMessageOpen(false)
-                                            setNewMessagePhone('')
-                                            setNewMessageContent('')
-                                        }}
+                                        onClick={handleSendMessage}
                                         disabled={sending}
                                         className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl h-11 px-8 shadow-lg shadow-indigo-500/25 border border-indigo-500/50"
                                     >
@@ -285,7 +267,11 @@ export default function DashboardPage() {
                                 </div>
                             ) : (
                                 messages.map((msg) => (
-                                    <div key={msg.id} className="p-4 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors cursor-pointer group flex items-center gap-4">
+                                    <div
+                                        key={msg.id}
+                                        onClick={() => router.push('/dashboard/messages')}
+                                        className="p-4 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors cursor-pointer group flex items-center gap-4"
+                                    >
                                         <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-white/10 flex items-center justify-center text-lg font-bold text-slate-600 dark:text-slate-300 uppercase">
                                             {(msg.contact_name || msg.contact_phone || '?')[0]}
                                         </div>
@@ -303,8 +289,7 @@ export default function DashboardPage() {
                                             </p>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            {msg.status === 'new' && <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />}
-                                            {msg.status === 'ai_handled' && <Badge variant="secondary" className="bg-purple-500/10 text-purple-600 text-[10px]">IA</Badge>}
+                                            {msg.is_ai_generated && <Badge variant="secondary" className="bg-purple-500/10 text-purple-600 text-[10px]">IA</Badge>}
                                         </div>
                                     </div>
                                 ))
@@ -322,9 +307,11 @@ export default function DashboardPage() {
                                 <p className="text-sm text-slate-500 pl-8">Aucune commande pour le moment.</p>
                             ) : (
                                 orders.map((order, i) => (
-                                    <div key={order.id} className="relative pl-10">
-                                        <div className={`absolute left-0 top-0 w-8 h-8 rounded-full bg-white dark:bg-[#121217] border border-slate-100 dark:border-white/10 flex items-center justify-center z-10 ${order.status === 'confirmed' ? 'text-emerald-500' : 'text-amber-500'
-                                            }`}>
+                                    <div key={order.id} className="relative pl-10" onClick={() => router.push('/dashboard/orders')}>
+                                        <div className={cn(
+                                            "absolute left-0 top-0 w-8 h-8 rounded-full bg-white dark:bg-[#121217] border border-slate-100 dark:border-white/10 flex items-center justify-center z-10",
+                                            order.status === 'confirmed' ? 'text-emerald-500' : 'text-amber-500'
+                                        )}>
                                             {order.status === 'confirmed' ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
                                         </div>
                                         <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
@@ -345,9 +332,9 @@ export default function DashboardPage() {
                     {/* Upgrade Card - Static */}
                     <div className="p-6 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-700 text-white relative overflow-hidden">
                         <div className="relative z-10">
-                            <h3 className="font-bold text-lg mb-2">Passez Pro 🚀</h3>
-                            <p className="text-indigo-100 text-sm mb-4">Débloquez les réponses IA illimitées.</p>
-                            <Button size="sm" className="bg-white text-indigo-600 hover:bg-indigo-50 border-0">
+                            <h3 className="font-bold text-lg mb-1">Passez Pro 🚀</h3>
+                            <p className="text-indigo-100 text-sm mb-4">Messages IA illimités.</p>
+                            <Button size="sm" className="bg-white text-indigo-600 hover:bg-indigo-50 border-0" onClick={() => router.push('/dashboard/billing')}>
                                 Voir les plans
                             </Button>
                         </div>
