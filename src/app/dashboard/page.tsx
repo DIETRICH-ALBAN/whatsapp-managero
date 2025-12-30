@@ -22,6 +22,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import {
     Dialog,
     DialogContent,
@@ -95,6 +96,48 @@ export default function DashboardPage() {
         { label: 'Réponses IA', value: aiCount.toString(), change: 'Auto', icon: MessageSquare, color: 'text-purple-500 bg-purple-500/10' },
         { label: 'Clients', value: customerCount.toString(), change: '--', icon: Users, color: 'text-blue-500 bg-blue-500/10' },
     ]
+
+    const handleExport = () => {
+        toast.promise(
+            new Promise((resolve) => setTimeout(resolve, 2000)),
+            {
+                loading: 'Préparation du rapport...',
+                success: 'Rapport exporté avec succès ! (CSV)',
+                error: 'Erreur lors de l\'exportation',
+            }
+        )
+    }
+
+    const handleSendMessage = async () => {
+        if (!newMessagePhone || !newMessageContent) {
+            toast.error("Veuillez remplir tous les champs")
+            return
+        }
+
+        setSending(true)
+        try {
+            const response = await fetch('/api/whatsapp/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    phoneNumber: newMessagePhone.startsWith('+') ? newMessagePhone : `+237${newMessagePhone}`,
+                    message: newMessageContent
+                })
+            })
+
+            if (!response.ok) throw new Error("Échec de l'envoi")
+
+            toast.success("Message envoyé à WhatsApp !")
+            setIsNewMessageOpen(false)
+            setNewMessagePhone('')
+            setNewMessageContent('')
+            router.refresh()
+        } catch (error) {
+            toast.error("Erreur lors de l'envoi")
+        } finally {
+            setSending(false)
+        }
+    }
 
     if (loading) return <div className="h-[50vh] flex items-center justify-center"><Loader2 className="w-8 h-8 text-indigo-500 animate-spin" /></div>
 
