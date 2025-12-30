@@ -531,11 +531,23 @@ export default function MessagesPage() {
 
                         <div className="p-4 bg-card/80 backdrop-blur-md border-t border-border mt-auto">
                             <div className="flex items-end gap-2 max-w-4xl mx-auto bg-muted/30 p-2 rounded-2xl border border-border focus-within:ring-2 focus-within:ring-indigo-500/20">
+                                <input
+                                    type="file"
+                                    id="file-upload"
+                                    className="hidden"
+                                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0]
+                                        if (file) {
+                                            toast.info(`Fichier sélectionné: ${file.name}`, { description: "L'envoi de fichiers sera bientôt disponible." })
+                                        }
+                                    }}
+                                />
                                 <Button
                                     size="icon"
                                     variant="ghost"
                                     className="h-9 w-9 shrink-0"
-                                    onClick={() => toast.info('Envoi de fichiers', { description: 'Cette fonctionnalité sera disponible dans la version Pro.' })}
+                                    onClick={() => document.getElementById('file-upload')?.click()}
                                 >
                                     <Paperclip className="w-4 h-4" />
                                 </Button>

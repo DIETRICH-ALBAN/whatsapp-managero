@@ -64,6 +64,30 @@ setInterval(() => {
     console.log(`[Health] Service actif - Sockets: ${activeSockets.size}`)
 }, 600000)
 
+// Fonction pour restaurer les sessions actives au redémarrage
+async function restoreSessions() {
+    console.log('[Restore] Vérification des sessions à restaurer...')
+    try {
+        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+        const { data: sessions } = await supabase.from('whatsapp_sessions').select('user_id, is_connected').eq('is_connected', true)
+
+        if (sessions && sessions.length > 0) {
+            console.log(`[Restore] ${sessions.length} sessions trouvées. Redémarrage...`)
+            for (const s of sessions) {
+                if (!activeSockets.has(s.user_id)) {
+                    startSession(s.user_id).catch(err => console.error(`[Restore] Echec pour ${s.user_id}`, err))
+                }
+            }
+        } else {
+            console.log('[Restore] Aucune session active à restaurer.')
+        }
+    } catch (error) {
+        console.error('[Restore] Erreur:', error)
+    }
+}
+// Démarrer la restauration après un court délai
+setTimeout(restoreSessions, 5000)
+
 async function startSession(userId, phoneNumber = null) {
     const isCodeMode = !!phoneNumber
     preferredMethod.set(userId, isCodeMode ? 'code' : 'qr')
