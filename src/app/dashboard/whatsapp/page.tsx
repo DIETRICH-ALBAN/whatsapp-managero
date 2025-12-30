@@ -21,7 +21,10 @@ import {
     XCircle,
     Copy,
     Check,
-    AlertTriangle
+    AlertTriangle,
+    Clock,
+    Shield,
+    Zap
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -45,6 +48,10 @@ export default function WhatsAppPage() {
     const [phoneToPair, setPhoneToPair] = useState('')
     const [lastUsedPhone, setLastUsedPhone] = useState('')
     const [copied, setCopied] = useState(false)
+
+    // Compteur de session
+    const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null)
+    const [sessionDuration, setSessionDuration] = useState('00:00:00')
 
     // Timer de sécurité pour éviter le blocage du bouton
     const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -81,6 +88,40 @@ export default function WhatsAppPage() {
             if (interval) clearInterval(interval)
         }
     }, [state.status])
+
+    // Gestion du compteur de session
+    useEffect(() => {
+        if (state.status === 'connected') {
+            // Démarrer le compteur si pas déjà démarré
+            if (!sessionStartTime) {
+                setSessionStartTime(new Date())
+            }
+        } else {
+            // Réinitialiser quand déconnecté
+            setSessionStartTime(null)
+            setSessionDuration('00:00:00')
+        }
+    }, [state.status])
+
+    // Mise à jour du compteur chaque seconde
+    useEffect(() => {
+        if (!sessionStartTime || state.status !== 'connected') return
+
+        const interval = setInterval(() => {
+            const now = new Date()
+            const diff = Math.floor((now.getTime() - sessionStartTime.getTime()) / 1000)
+
+            const hours = Math.floor(diff / 3600)
+            const minutes = Math.floor((diff % 3600) / 60)
+            const seconds = diff % 60
+
+            setSessionDuration(
+                `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+            )
+        }, 1000)
+
+        return () => clearInterval(interval)
+    }, [sessionStartTime, state.status])
 
     const checkStatus = async () => {
         try {
@@ -232,6 +273,58 @@ export default function WhatsAppPage() {
                             {state.status === 'connected' ? 'En ligne' : 'Action Requise'}
                         </Badge>
                     </div>
+
+                    {/* Session Stats - Affiché uniquement quand connecté */}
+                    {state.status === 'connected' && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5 }}
+                            className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 pb-8 border-b border-white/5"
+                        >
+                            {/* Compteur de session */}
+                            <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/5 rounded-2xl p-5 border border-white/5">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center">
+                                        <Clock className="w-5 h-5 text-indigo-400" />
+                                    </div>
+                                    <span className="text-slate-400 text-sm font-medium">Durée de session</span>
+                                </div>
+                                <div className="text-3xl font-black text-white font-mono tracking-tight">
+                                    {sessionDuration}
+                                </div>
+                                <div className="text-xs text-slate-500 mt-1">Temps de connexion actif</div>
+                            </div>
+
+                            {/* Sécurité */}
+                            <div className="bg-gradient-to-br from-emerald-500/10 to-green-500/5 rounded-2xl p-5 border border-white/5">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                                        <Shield className="w-5 h-5 text-emerald-400" />
+                                    </div>
+                                    <span className="text-slate-400 text-sm font-medium">Sécurité</span>
+                                </div>
+                                <div className="text-2xl font-bold text-emerald-400">
+                                    Chiffré E2E
+                                </div>
+                                <div className="text-xs text-slate-500 mt-1">Connexion sécurisée active</div>
+                            </div>
+
+                            {/* Performance */}
+                            <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/5 rounded-2xl p-5 border border-white/5">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                                        <Zap className="w-5 h-5 text-amber-400" />
+                                    </div>
+                                    <span className="text-slate-400 text-sm font-medium">Synchronisation</span>
+                                </div>
+                                <div className="text-2xl font-bold text-amber-400">
+                                    Temps réel
+                                </div>
+                                <div className="text-xs text-slate-500 mt-1">Messages instantanés</div>
+                            </div>
+                        </motion.div>
+                    )}
 
                     {/* Method Toggle */}
                     {state.status === 'disconnected' && (
