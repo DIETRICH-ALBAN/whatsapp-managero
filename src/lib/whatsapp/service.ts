@@ -63,3 +63,7 @@ export async function disconnectWhatsApp(userId: string) {
 export async function sendWhatsAppMessage(userId: string, phoneNumber: string, message: string) {
     return callService(`/send/${userId}`, 'POST', { phoneNumber, message })
 }
+
+export async function sendWhatsAppMedia(userId: string, phoneNumber: string, mediaUrl: string, caption?: string, type: string = 'image') {
+    return callService(`/send-media/${userId}`, 'POST', { phoneNumber, mediaUrl, caption, type })
+}

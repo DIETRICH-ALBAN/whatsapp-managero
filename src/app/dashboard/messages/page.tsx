@@ -535,11 +535,69 @@ export default function MessagesPage() {
                                     id="file-upload"
                                     className="hidden"
                                     accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
-                                    onChange={(e) => {
+                                    onChange={async (e) => {
                                         const file = e.target.files?.[0]
-                                        if (file) {
-                                            toast.info(`Fichier sélectionné: ${file.name}`, { description: "L'envoi de fichiers sera bientôt disponible." })
+                                        if (!file || !selectedConvoId) return
+
+                                        const toastId = toast.loading('Envoi du fichier...')
+
+                                        try {
+                                            const ext = file.name.split('.').pop()
+                                            const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`
+
+                                            // 1. Upload to Supabase
+                                            const { data: uploadData, error: uploadError } = await supabase.storage
+                                                .from('whatsapp-media')
+                                                .upload(fileName, file, { contentType: file.type })
+
+                                            if (uploadError) throw new Error('Erreur upload: ' + uploadError.message)
+
+                                            const { data: { publicUrl } } = supabase.storage.from('whatsapp-media').getPublicUrl(fileName)
+
+                                            // 2. Determine type
+                                            let type = 'document'
+                                            if (file.type.startsWith('image/')) type = 'image'
+                                            else if (file.type.startsWith('video/')) type = 'video'
+                                            else if (file.type.startsWith('audio/')) type = 'audio'
+
+                                            // 3. Send via API
+                                            const response = await fetch('/api/whatsapp/send-media', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                    phoneNumber: activeConversation?.contact_phone,
+                                                    mediaUrl: publicUrl,
+                                                    type: type,
+                                                    caption: file.name,
+                                                    conversationId: selectedConvoId
+                                                })
+                                            })
+
+                                            if (!response.ok) throw new Error('Erreur envoi WhatsApp')
+
+                                            toast.success('Fichier envoyé !', { id: toastId })
+
+                                            // Optimistic add
+                                            const optimisticMsg: Message = {
+                                                id: `temp-${Date.now()}`,
+                                                content: file.name,
+                                                direction: 'outbound',
+                                                status: 'sent',
+                                                created_at: new Date().toISOString(),
+                                                conversation_id: selectedConvoId,
+                                                message_type: type as any,
+                                                media_url: publicUrl
+                                            }
+                                            setMessages(prev => [...prev, optimisticMsg])
+                                            scrollToBottom()
+
+                                        } catch (err: any) {
+                                            console.error(err)
+                                            toast.error('Erreur: ' + err.message, { id: toastId })
                                         }
+
+                                        // Reset input
+                                        e.target.value = ''
                                     }}
                                 />
                                 <Button

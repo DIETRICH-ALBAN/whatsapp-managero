@@ -407,16 +407,71 @@ app.post('/connect/:userId', authMiddleware, async (req, res) => {
     res.json(await startSession(req.params.userId, req.body.phoneNumber))
 })
 
-app.get('/status/:userId', authMiddleware, (req, res) => {
+app.get('/status/:userId', authMiddleware, async (req, res) => {
     const userId = req.params.userId
+    const socket = activeSockets.get(userId)
+    let profilePic = null
+
+    if (socket && connectionStatus.get(userId) === 'connected') {
+        try {
+            profilePic = await socket.profilePictureUrl(socket.user.id, 'image')
+        } catch (e) { }
+    }
+
     res.json({
         status: connectionStatus.get(userId) || 'disconnected',
         method: preferredMethod.get(userId) || 'qr',
         qrCode: qrCodes.get(userId),
         pairingCode: pairingCodes.get(userId),
-        phoneNumber: activeSockets.get(userId)?.user?.id.split(':')[0],
-        sessionStartTime: sessionStartTimes.get(userId) // Ajout pour le frontend
+        phoneNumber: socket?.user?.id.split(':')[0],
+        sessionStartTime: sessionStartTimes.get(userId),
+        profilePic
     })
+})
+
+app.post('/send/:userId', authMiddleware, async (req, res) => {
+    const { userId } = req.params
+    const { phoneNumber, message } = req.body
+    const socket = activeSockets.get(userId)
+
+    if (!socket || connectionStatus.get(userId) !== 'connected') {
+        return res.status(400).json({ error: 'WhatsApp non connecté' })
+    }
+
+    try {
+        const jid = `${phoneNumber}@s.whatsapp.net`
+        await socket.sendMessage(jid, { text: message })
+        res.json({ success: true })
+    } catch (error) {
+        console.error('[Send] Erreur:', error.message)
+        res.status(500).json({ error: error.message })
+    }
+})
+
+app.post('/send-media/:userId', authMiddleware, async (req, res) => {
+    const { userId } = req.params
+    const { phoneNumber, mediaUrl, caption, type } = req.body
+    const socket = activeSockets.get(userId)
+
+    if (!socket || connectionStatus.get(userId) !== 'connected') {
+        return res.status(400).json({ error: 'WhatsApp non connecté' })
+    }
+
+    try {
+        const jid = `${phoneNumber.includes('-') ? phoneNumber : phoneNumber + '@s.whatsapp.net'}`
+        let messageOptions = {}
+
+        if (type === 'image') messageOptions = { image: { url: mediaUrl }, caption }
+        else if (type === 'video') messageOptions = { video: { url: mediaUrl }, caption }
+        else if (type === 'audio') messageOptions = { audio: { url: mediaUrl }, mimetype: 'audio/mp4', ptt: true }
+        else messageOptions = { document: { url: mediaUrl }, fileName: caption || 'file', mimetype: 'application/octet-stream' }
+
+        await socket.sendMessage(jid, messageOptions)
+        res.json({ success: true })
+    } catch (error) {
+        console.error('[SendMedia] Erreur:', error.message)
+        res.status(500).json({ error: error.message })
+    }
 })
 
 app.delete('/disconnect/:userId', authMiddleware, async (req, res) => {
