@@ -37,6 +37,8 @@ interface Message {
     created_at: string
     is_ai_generated?: boolean
     conversation_id: string
+    message_type?: 'text' | 'image' | 'video' | 'audio' | 'document' | 'sticker'
+    media_url?: string
 }
 
 // Types (Frontend definitions matching DB)
@@ -406,6 +408,41 @@ export default function MessagesPage() {
                                             "max-w-[80%] rounded-2xl px-3.5 py-2 text-xs shadow-sm relative group",
                                             isMe ? "bg-indigo-600 text-white rounded-tr-none" : "bg-card border border-border rounded-tl-none"
                                         )}>
+                                            {/* Rendu des médias */}
+                                            {msg.media_url && msg.message_type === 'image' && (
+                                                <img
+                                                    src={msg.media_url}
+                                                    alt="Image"
+                                                    className="rounded-lg max-w-full mb-2 cursor-pointer hover:opacity-90 transition-opacity"
+                                                    onClick={() => window.open(msg.media_url, '_blank')}
+                                                />
+                                            )}
+                                            {msg.media_url && msg.message_type === 'video' && (
+                                                <video
+                                                    src={msg.media_url}
+                                                    controls
+                                                    className="rounded-lg max-w-full mb-2"
+                                                />
+                                            )}
+                                            {msg.media_url && msg.message_type === 'audio' && (
+                                                <audio
+                                                    src={msg.media_url}
+                                                    controls
+                                                    className="w-full mb-2"
+                                                />
+                                            )}
+                                            {msg.media_url && msg.message_type === 'document' && (
+                                                <a
+                                                    href={msg.media_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="flex items-center gap-2 bg-muted/50 rounded-lg p-2 mb-2 hover:bg-muted transition-colors"
+                                                >
+                                                    <span className="text-lg">📄</span>
+                                                    <span className="text-xs font-medium underline">Télécharger le document</span>
+                                                </a>
+                                            )}
+
                                             <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                                             {msg.is_ai_generated && (
                                                 <div className="absolute -top-2 -right-2 bg-indigo-100 text-indigo-700 text-[8px] px-1.5 py-0.5 rounded-full font-bold shadow-md border border-indigo-200">IA</div>

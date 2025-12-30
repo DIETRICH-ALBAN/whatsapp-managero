@@ -9,7 +9,8 @@ import cors from 'cors'
 import makeWASocket, {
     useMultiFileAuthState,
     DisconnectReason,
-    fetchLatestBaileysVersion
+    fetchLatestBaileysVersion,
+    downloadMediaMessage
 } from '@whiskeysockets/baileys'
 
 import { Boom } from '@hapi/boom'
@@ -223,8 +224,53 @@ async function startSession(userId, phoneNumber = null) {
                 const senderNumber = jid.split('@')[0]
                 const contactName = msg.pushName || senderNumber
 
-                let messageContent = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '[Média]'
-                if (!messageContent || messageContent === '[Média]') continue
+                // Détection du type de message
+                let messageContent = null
+                let messageType = 'text'
+                let mediaUrl = null
+
+                if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
+                    messageContent = msg.message?.conversation || msg.message?.extendedTextMessage?.text
+                    messageType = 'text'
+                } else if (msg.message?.imageMessage) {
+                    messageContent = msg.message.imageMessage.caption || '📷 Image'
+                    messageType = 'image'
+                } else if (msg.message?.videoMessage) {
+                    messageContent = msg.message.videoMessage.caption || '🎬 Vidéo'
+                    messageType = 'video'
+                } else if (msg.message?.audioMessage) {
+                    messageContent = '🎤 Message vocal'
+                    messageType = 'audio'
+                } else if (msg.message?.documentMessage) {
+                    messageContent = `📄 ${msg.message.documentMessage.fileName || 'Document'}`
+                    messageType = 'document'
+                } else if (msg.message?.stickerMessage) {
+                    messageContent = '🎭 Sticker'
+                    messageType = 'sticker'
+                }
+
+                if (!messageContent) continue
+
+                // Téléchargement et upload du média si applicable
+                if (['image', 'video', 'audio', 'document'].includes(messageType)) {
+                    try {
+                        const buffer = await downloadMediaMessage(msg, 'buffer', {})
+                        const ext = messageType === 'image' ? 'jpg' : messageType === 'video' ? 'mp4' : messageType === 'audio' ? 'ogg' : 'bin'
+                        const fileName = `${userId}/${Date.now()}_${senderNumber}.${ext}`
+
+                        const { data: uploadData, error: uploadError } = await supabase.storage
+                            .from('whatsapp-media')
+                            .upload(fileName, buffer, { contentType: `${messageType}/*`, upsert: true })
+
+                        if (!uploadError && uploadData) {
+                            const { data: publicUrl } = supabase.storage.from('whatsapp-media').getPublicUrl(fileName)
+                            mediaUrl = publicUrl.publicUrl
+                            console.log(`[Media] Uploaded: ${mediaUrl}`)
+                        }
+                    } catch (mediaErr) {
+                        console.error(`[Media] Download/Upload error:`, mediaErr.message)
+                    }
+                }
 
                 try {
                     const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-managero.vercel.app'
@@ -246,8 +292,13 @@ async function startSession(userId, phoneNumber = null) {
                     }
 
                     await supabase.from('messages').insert({
-                        conversation_id: conversation.id, contact_phone: senderNumber,
-                        content: messageContent, direction: 'inbound', status: 'received'
+                        conversation_id: conversation.id,
+                        contact_phone: senderNumber,
+                        content: messageContent,
+                        direction: 'inbound',
+                        status: 'received',
+                        message_type: messageType,
+                        media_url: mediaUrl
                     })
 
                     if (conversation.is_ai_enabled && conversation.agent_id) {
