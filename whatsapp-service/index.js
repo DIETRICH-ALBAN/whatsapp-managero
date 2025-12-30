@@ -44,6 +44,7 @@ const qrCodes = new Map()
 const connectionStatus = new Map()
 const pairingCodes = new Map()
 const preferredMethod = new Map() // 'qr' ou 'code'
+const pendingPairing = new Map()
 
 const authMiddleware = (req, res, next) => {
     if (req.headers['x-api-secret'] !== API_SECRET) {
@@ -62,35 +63,27 @@ setInterval(() => {
 
 async function startSession(userId, phoneNumber = null) {
     preferredMethod.set(userId, phoneNumber ? 'code' : 'qr')
+    if (phoneNumber) pendingPairing.set(userId, phoneNumber.replace(/\D/g, ''))
 
-    // Fonction helper pour générer le code
-    const triggerPairingCode = async (socket, phone) => {
-        if (!phone) return
-        const cleanPhone = phone.replace(/\D/g, '')
-        console.log(`[Pairing] Démarrage génération pour: ${cleanPhone}`)
+    const sessionDir = path.join(__dirname, 'sessions')
+    const sessionPath = path.join(sessionDir, userId)
 
-        // On vide les anciens codes pour forcer le frontend à voir le chargement
-        qrCodes.delete(userId)
-        pairingCodes.delete(userId)
-
+    // SÉCURITÉ : Si on demande un nouveau code, on DOIT supprimer l'ancienne session locale
+    // sinon Baileys s'embrouille entre l'ancien état et le nouveau.
+    if (phoneNumber && fs.existsSync(sessionPath)) {
+        console.log(`[Session] Nettoyage session pour fresh pairing: ${userId}`)
         try {
-            // Un petit délai est nécessaire pour que le socket Baileys soit prêt à générer
-            await new Promise(resolve => setTimeout(resolve, 1500))
-            const code = await socket.requestPairingCode(cleanPhone)
-            console.log(`[Pairing] Code généré avec succès: ${code}`)
-            pairingCodes.set(userId, code)
-        } catch (err) {
-            console.error(`[Pairing] ERREUR FATALE Baileys:`, err.message)
-            pairingCodes.set(userId, "ERREUR") // Signal d'erreur au frontend
-        }
+            if (activeSockets.has(userId)) {
+                try { activeSockets.get(userId).end(undefined) } catch (e) { }
+                activeSockets.delete(userId)
+            }
+            fs.rmSync(sessionPath, { recursive: true, force: true })
+            qrCodes.delete(userId)
+            pairingCodes.delete(userId)
+        } catch (e) { console.error("Erreur nettoyage:", e.message) }
     }
 
     if (activeSockets.has(userId)) {
-        const socket = activeSockets.get(userId)
-        if (phoneNumber && connectionStatus.get(userId) !== 'connected') {
-            console.log(`[Session] Régénération code pour session existante ${userId}`)
-            triggerPairingCode(socket, phoneNumber) // On lance en tâche de fond
-        }
         return {
             status: connectionStatus.get(userId) || 'connecting',
             qrCode: qrCodes.get(userId),
@@ -99,13 +92,8 @@ async function startSession(userId, phoneNumber = null) {
     }
 
     try {
-        console.log(`[Session] Démarrage pour ${userId} ${phoneNumber ? `(Numéro: ${phoneNumber})` : ''}`)
+        console.log(`[Session] Démarrage... ${userId} (Mode: ${phoneNumber ? 'CODE' : 'QR'})`)
         const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-
-        const sessionDir = path.join(__dirname, 'sessions')
-        const sessionPath = path.join(sessionDir, userId)
-
-        // Nettoyage dossier au cas où
         if (!fs.existsSync(sessionDir)) fs.mkdirSync(sessionDir, { recursive: true })
 
         // 1. Restaurer depuis Supabase si le dossier est vide
@@ -145,11 +133,25 @@ async function startSession(userId, phoneNumber = null) {
 
         socket.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update
+
+            // LOGIQUE DE SYNCHRONISATION PARFAITE
             if (qr) {
-                console.log(`[QR] Nouveau signal reçu pour ${userId}`)
-                const qrData = await QRCode.toDataURL(qr)
-                qrCodes.set(userId, qrData)
-                // On ne touche plus à pairingCodes ici pour éviter la disparition éclair
+                const phone = pendingPairing.get(userId)
+                if (phone) {
+                    console.log(`[Pairing] Signal QR intercepté. Demande du code pour ${phone}...`)
+                    try {
+                        const code = await socket.requestPairingCode(phone)
+                        console.log(`[Pairing] Code REÇU de WhatsApp: ${code}`)
+                        pairingCodes.set(userId, code)
+                        pendingPairing.delete(userId) // Satisfait
+                    } catch (err) {
+                        console.error(`[Pairing] Échec critique:`, err.message)
+                        pairingCodes.set(userId, "ERREUR")
+                    }
+                } else {
+                    const qrData = await QRCode.toDataURL(qr)
+                    qrCodes.set(userId, qrData)
+                }
             }
 
             if (connection === 'open') {
