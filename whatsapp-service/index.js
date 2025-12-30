@@ -219,132 +219,136 @@ async function startSession(userId, phoneNumber = null) {
         socket.ev.on('messages.upsert', async (m) => {
             const messages = m.messages
             for (const msg of messages) {
-                if (msg.key.fromMe || msg.key.remoteJid === 'status@broadcast') continue
-
-                const jid = msg.key.remoteJid
-                const senderNumber = jid.split('@')[0]
-                const contactName = msg.pushName || senderNumber
-
-                // Détection du type de message
-                let messageContent = null
-                let messageType = 'text'
-                let mediaUrl = null
-
-                if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
-                    messageContent = msg.message?.conversation || msg.message?.extendedTextMessage?.text
-                    messageType = 'text'
-                } else if (msg.message?.imageMessage) {
-                    messageContent = msg.message.imageMessage.caption || '📷 Image'
-                    messageType = 'image'
-                } else if (msg.message?.videoMessage) {
-                    messageContent = msg.message.videoMessage.caption || '🎬 Vidéo'
-                    messageType = 'video'
-                } else if (msg.message?.audioMessage) {
-                    messageContent = '🎤 Message vocal'
-                    messageType = 'audio'
-                } else if (msg.message?.documentMessage) {
-                    messageContent = `📄 ${msg.message.documentMessage.fileName || 'Document'}`
-                    messageType = 'document'
-                } else if (msg.message?.stickerMessage) {
-                    messageContent = '🎭 Sticker'
-                    messageType = 'sticker'
-                }
-
-                if (!messageContent) continue
-
-                // Téléchargement et upload du média si applicable
-                if (['image', 'video', 'audio', 'document'].includes(messageType)) {
-                    try {
-                        const buffer = await downloadMediaMessage(msg, 'buffer', {})
-                        const ext = messageType === 'image' ? 'jpg' : messageType === 'video' ? 'mp4' : messageType === 'audio' ? 'ogg' : 'bin'
-                        const fileName = `${userId}/${Date.now()}_${senderNumber}.${ext}`
-
-                        const { data: uploadData, error: uploadError } = await supabase.storage
-                            .from('whatsapp-media')
-                            .upload(fileName, buffer, { contentType: `${messageType}/*`, upsert: true })
-
-                        if (!uploadError && uploadData) {
-                            const { data: publicUrl } = supabase.storage.from('whatsapp-media').getPublicUrl(fileName)
-                            mediaUrl = publicUrl.publicUrl
-                            console.log(`[Media] Uploaded: ${mediaUrl}`)
-                        }
-                    } catch (mediaErr) {
-                        console.error(`[Media] Download/Upload error:`, mediaErr.message)
-                    }
-                }
-
-                // Détection Groupe vs Contact
-                let finalContactName = contactName
-                if (jid.endsWith('@g.us')) {
-                    try {
-                        const groupMetadata = await socket.groupMetadata(jid)
-                        finalContactName = groupMetadata.subject || 'Groupe WhatsApp'
-                    } catch (gErr) {
-                        console.log(`[Group] Impossible de récupérer le nom du groupe ${jid}`)
-                        finalContactName = 'Groupe'
-                    }
-                }
-
                 try {
-                    const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-managero.vercel.app'
+                    if (msg.key.fromMe || msg.key.remoteJid === 'status@broadcast') continue
 
-                    let { data: conversation } = await supabase.from('conversations')
-                        .select('*').eq('user_id', userId).eq('contact_phone', senderNumber).single()
+                    const jid = msg.key.remoteJid
+                    const senderNumber = jid.split('@')[0]
+                    const contactName = msg.pushName || senderNumber
 
-                    if (!conversation) {
-                        const { data: newC } = await supabase.from('conversations').insert({
-                            user_id: userId,
-                            contact_phone: senderNumber,
-                            contact_name: finalContactName,
-                            last_message: messageContent,
-                            last_message_at: new Date().toISOString(),
-                            unread_count: 1
-                        }).select().single()
-                        conversation = newC
-                    } else {
-                        // Mise à jour : on met à jour le nom aussi si on l'a (pour corriger les anciens numéros)
-                        const updateData = {
-                            last_message: messageContent,
-                            last_message_at: new Date().toISOString(),
-                            unread_count: (conversation.unread_count || 0) + 1
-                        }
-                        // Si le nom a changé ou était un numéro, on le met à jour
-                        if (finalContactName && finalContactName !== senderNumber) {
-                            updateData.contact_name = finalContactName
-                        }
+                    // Détection du type de message
+                    let messageContent = null
+                    let messageType = 'text'
+                    let mediaUrl = null
 
-                        await supabase.from('conversations').update(updateData).eq('id', conversation.id)
+                    if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
+                        messageContent = msg.message?.conversation || msg.message?.extendedTextMessage?.text
+                        messageType = 'text'
+                    } else if (msg.message?.imageMessage) {
+                        messageContent = msg.message.imageMessage.caption || '📷 Image'
+                        messageType = 'image'
+                    } else if (msg.message?.videoMessage) {
+                        messageContent = msg.message.videoMessage.caption || '🎬 Vidéo'
+                        messageType = 'video'
+                    } else if (msg.message?.audioMessage) {
+                        messageContent = '🎤 Message vocal'
+                        messageType = 'audio'
+                    } else if (msg.message?.documentMessage) {
+                        messageContent = `📄 ${msg.message.documentMessage.fileName || 'Document'}`
+                        messageType = 'document'
+                    } else if (msg.message?.stickerMessage) {
+                        messageContent = '🎭 Sticker'
+                        messageType = 'sticker'
                     }
 
-                    await supabase.from('messages').insert({
-                        conversation_id: conversation.id,
-                        contact_phone: senderNumber,
-                        content: messageContent,
-                        direction: 'inbound',
-                        status: 'received',
-                        message_type: messageType,
-                        media_url: mediaUrl
-                    })
+                    if (!messageContent) continue
 
-                    if (conversation.is_ai_enabled && conversation.agent_id) {
+                    // Téléchargement et upload du média si applicable
+                    if (['image', 'video', 'audio', 'document'].includes(messageType)) {
                         try {
-                            await socket.sendPresenceUpdate('composing', jid)
-                            const aiRes = await fetch(`${SITE_URL}/api/ai/chat`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'x-api-secret': API_SECRET },
-                                body: JSON.stringify({ conversationId: conversation.id, message: messageContent, agentId: conversation.agent_id })
-                            })
-                            const aiData = await aiRes.json()
-                            if (aiData.response) {
-                                await socket.sendMessage(jid, { text: aiData.response })
-                                await supabase.from('messages').insert({
-                                    conversation_id: conversation.id, contact_phone: senderNumber,
-                                    content: aiData.response, direction: 'outbound', status: 'sent', is_ai_generated: true
-                                })
+                            const buffer = await downloadMediaMessage(msg, 'buffer', {})
+                            const ext = messageType === 'image' ? 'jpg' : messageType === 'video' ? 'mp4' : messageType === 'audio' ? 'ogg' : 'bin'
+                            const fileName = `${userId}/${Date.now()}_${senderNumber}.${ext}`
+
+                            const { data: uploadData, error: uploadError } = await supabase.storage
+                                .from('whatsapp-media')
+                                .upload(fileName, buffer, { contentType: `${messageType}/*`, upsert: true })
+
+                            if (!uploadError && uploadData) {
+                                const { data: publicUrl } = supabase.storage.from('whatsapp-media').getPublicUrl(fileName)
+                                mediaUrl = publicUrl.publicUrl
+                                console.log(`[Media] Uploaded: ${mediaUrl}`)
                             }
-                        } catch (e) { }
+                        } catch (mediaErr) {
+                            console.error(`[Media] Download/Upload error:`, mediaErr.message)
+                        }
                     }
-                } catch (e) { }
+
+                    // Détection Groupe vs Contact
+                    let finalContactName = contactName
+                    if (jid.endsWith('@g.us')) {
+                        try {
+                            const groupMetadata = await socket.groupMetadata(jid)
+                            finalContactName = groupMetadata.subject || 'Groupe WhatsApp'
+                        } catch (gErr) {
+                            console.log(`[Group] Impossible de récupérer le nom du groupe ${jid}`)
+                            finalContactName = 'Groupe'
+                        }
+                    }
+
+                    try {
+                        const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-managero.vercel.app'
+
+                        let { data: conversation } = await supabase.from('conversations')
+                            .select('*').eq('user_id', userId).eq('contact_phone', senderNumber).single()
+
+                        if (!conversation) {
+                            const { data: newC } = await supabase.from('conversations').insert({
+                                user_id: userId,
+                                contact_phone: senderNumber,
+                                contact_name: finalContactName,
+                                last_message: messageContent,
+                                last_message_at: new Date().toISOString(),
+                                unread_count: 1
+                            }).select().single()
+                            conversation = newC
+                        } else {
+                            // Mise à jour : on met à jour le nom aussi si on l'a (pour corriger les anciens numéros)
+                            const updateData = {
+                                last_message: messageContent,
+                                last_message_at: new Date().toISOString(),
+                                unread_count: (conversation.unread_count || 0) + 1
+                            }
+                            // Si le nom a changé ou était un numéro, on le met à jour
+                            if (finalContactName && finalContactName !== senderNumber) {
+                                updateData.contact_name = finalContactName
+                            }
+
+                            await supabase.from('conversations').update(updateData).eq('id', conversation.id)
+                        }
+
+                        await supabase.from('messages').insert({
+                            conversation_id: conversation.id,
+                            contact_phone: senderNumber,
+                            content: messageContent,
+                            direction: 'inbound',
+                            status: 'received',
+                            message_type: messageType,
+                            media_url: mediaUrl
+                        })
+
+                        if (conversation.is_ai_enabled && conversation.agent_id) {
+                            try {
+                                await socket.sendPresenceUpdate('composing', jid)
+                                const aiRes = await fetch(`${SITE_URL}/api/ai/chat`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'x-api-secret': API_SECRET },
+                                    body: JSON.stringify({ conversationId: conversation.id, message: messageContent, agentId: conversation.agent_id })
+                                })
+                                const aiData = await aiRes.json()
+                                if (aiData.response) {
+                                    await socket.sendMessage(jid, { text: aiData.response })
+                                    await supabase.from('messages').insert({
+                                        conversation_id: conversation.id, contact_phone: senderNumber,
+                                        content: aiData.response, direction: 'outbound', status: 'sent', is_ai_generated: true
+                                    })
+                                }
+                            } catch (e) { }
+                        }
+                    } catch (e) { }
+                } catch (msgErr) {
+                    console.error('[Error processing message]', msgErr)
+                }
             }
         })
 
