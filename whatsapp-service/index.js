@@ -127,27 +127,18 @@ async function startSession(userId, phoneNumber = null) {
         const { state, saveCreds } = await useMultiFileAuthState(sessionPath)
         const { version } = await fetchLatestBaileysVersion()
 
-        const socket = makeWASocket.default ? makeWASocket.default({
+        const socketConfig = {
             version,
             auth: state,
-            printQRInTerminal: true,
             browser: ['VibeVendor', 'Chrome', '1.0.0'],
             logger: pino({ level: 'info' }),
             connectTimeoutMs: 60000,
             defaultQueryTimeoutMs: 0,
             keepAliveIntervalMs: 10000,
             generateHighQualityLinkPreview: true
-        }) : makeWASocket({
-            version,
-            auth: state,
-            printQRInTerminal: true,
-            browser: ['VibeVendor', 'Chrome', '1.0.0'],
-            logger: pino({ level: 'info' }),
-            connectTimeoutMs: 60000,
-            defaultQueryTimeoutMs: 0,
-            keepAliveIntervalMs: 10000,
-            generateHighQualityLinkPreview: true
-        })
+        }
+
+        const socket = makeWASocket.default ? makeWASocket.default(socketConfig) : makeWASocket(socketConfig)
 
         activeSockets.set(userId, socket)
         connectionStatus.set(userId, 'connecting')
