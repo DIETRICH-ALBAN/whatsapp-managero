@@ -46,7 +46,7 @@ const connectionStatus = new Map()
 const pairingCodes = new Map()
 const preferredMethod = new Map() // 'qr' ou 'code'
 const pendingPairing = new Map()
-const pairingCodeRequested = new Map()
+const sessionStartTimes = new Map() // Stocke le timestamp de connexion réussi
 
 const authMiddleware = (req, res, next) => {
     if (req.headers['x-api-secret'] !== API_SECRET) {
@@ -175,6 +175,7 @@ async function startSession(userId, phoneNumber = null) {
             if (connection === 'open') {
                 console.log(`[Connexion] Connecté ! ${userId}`)
                 connectionStatus.set(userId, 'connected')
+                sessionStartTimes.set(userId, new Date().toISOString()) // Fix timer reset
                 qrCodes.delete(userId)
                 pairingCodes.delete(userId)
                 pendingPairing.delete(userId)
@@ -272,6 +273,18 @@ async function startSession(userId, phoneNumber = null) {
                     }
                 }
 
+                // Détection Groupe vs Contact
+                let finalContactName = contactName
+                if (jid.endsWith('@g.us')) {
+                    try {
+                        const groupMetadata = await socket.groupMetadata(jid)
+                        finalContactName = groupMetadata.subject || 'Groupe WhatsApp'
+                    } catch (gErr) {
+                        console.log(`[Group] Impossible de récupérer le nom du groupe ${jid}`)
+                        finalContactName = 'Groupe'
+                    }
+                }
+
                 try {
                     const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-managero.vercel.app'
 
@@ -280,15 +293,27 @@ async function startSession(userId, phoneNumber = null) {
 
                     if (!conversation) {
                         const { data: newC } = await supabase.from('conversations').insert({
-                            user_id: userId, contact_phone: senderNumber, contact_name: contactName,
-                            last_message: messageContent, last_message_at: new Date().toISOString(), unread_count: 1
+                            user_id: userId,
+                            contact_phone: senderNumber,
+                            contact_name: finalContactName,
+                            last_message: messageContent,
+                            last_message_at: new Date().toISOString(),
+                            unread_count: 1
                         }).select().single()
                         conversation = newC
                     } else {
-                        await supabase.from('conversations').update({
-                            last_message: messageContent, last_message_at: new Date().toISOString(),
+                        // Mise à jour : on met à jour le nom aussi si on l'a (pour corriger les anciens numéros)
+                        const updateData = {
+                            last_message: messageContent,
+                            last_message_at: new Date().toISOString(),
                             unread_count: (conversation.unread_count || 0) + 1
-                        }).eq('id', conversation.id)
+                        }
+                        // Si le nom a changé ou était un numéro, on le met à jour
+                        if (finalContactName && finalContactName !== senderNumber) {
+                            updateData.contact_name = finalContactName
+                        }
+
+                        await supabase.from('conversations').update(updateData).eq('id', conversation.id)
                     }
 
                     await supabase.from('messages').insert({
@@ -341,7 +366,8 @@ app.get('/status/:userId', authMiddleware, (req, res) => {
         method: preferredMethod.get(userId) || 'qr',
         qrCode: qrCodes.get(userId),
         pairingCode: pairingCodes.get(userId),
-        phoneNumber: activeSockets.get(userId)?.user?.id.split(':')[0]
+        phoneNumber: activeSockets.get(userId)?.user?.id.split(':')[0],
+        sessionStartTime: sessionStartTimes.get(userId) // Ajout pour le frontend
     })
 })
 
