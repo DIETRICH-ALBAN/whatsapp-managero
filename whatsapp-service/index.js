@@ -62,8 +62,17 @@ setInterval(() => {
 }, 600000) // Toutes les 10 minutes
 
 async function startSession(userId, phoneNumber = null) {
-    preferredMethod.set(userId, phoneNumber ? 'code' : 'qr')
-    if (phoneNumber) pendingPairing.set(userId, phoneNumber.replace(/\D/g, ''))
+    const isCodeMode = !!phoneNumber
+    preferredMethod.set(userId, isCodeMode ? 'code' : 'qr')
+
+    // Reset systématique pour éviter les résidus d'anciennes tentatives
+    qrCodes.delete(userId)
+    pairingCodes.delete(userId)
+    if (isCodeMode) {
+        pendingPairing.set(userId, phoneNumber.replace(/\D/g, ''))
+    } else {
+        pendingPairing.delete(userId)
+    }
 
     const sessionDir = path.join(__dirname, 'sessions')
     const sessionPath = path.join(sessionDir, userId)
@@ -78,8 +87,6 @@ async function startSession(userId, phoneNumber = null) {
                 activeSockets.delete(userId)
             }
             fs.rmSync(sessionPath, { recursive: true, force: true })
-            qrCodes.delete(userId)
-            pairingCodes.delete(userId)
         } catch (e) { console.error("Erreur nettoyage:", e.message) }
     }
 
@@ -345,11 +352,6 @@ async function startSession(userId, phoneNumber = null) {
                 } catch (dbError) { console.error(`[DB] Erreur:`, dbError.message) }
             }
         })
-
-        // Nouveau: Si un numéro est fourni, générer un code de couplage (Pairing Code)
-        if (phoneNumber) {
-            await triggerPairingCode(socket, phoneNumber)
-        }
 
         return { status: 'connecting' }
     } catch (e) {
