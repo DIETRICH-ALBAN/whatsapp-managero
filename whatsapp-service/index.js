@@ -380,12 +380,18 @@ app.get('/debug/:userId', authMiddleware, (req, res) => {
 })
 
 app.delete('/disconnect/:userId', authMiddleware, async (req, res) => {
-    const socket = activeSockets.get(req.params.userId)
+    const userId = req.params.userId
+    const socket = activeSockets.get(userId)
     if (socket) {
         try { await socket.logout() } catch (e) { }
-        activeSockets.delete(req.params.userId)
-        connectionStatus.set(req.params.userId, 'disconnected')
+        activeSockets.delete(userId)
+        connectionStatus.set(userId, 'disconnected')
     }
+    // Nettoyage complet
+    qrCodes.delete(userId)
+    pairingCodes.delete(userId)
+    preferredMethod.delete(userId)
+
     res.json({ success: true })
 })
 

@@ -17,7 +17,8 @@ import {
     WifiOff,
     Keyboard,
     Info,
-    ArrowRight
+    ArrowRight,
+    XCircle
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -50,7 +51,7 @@ export default function WhatsAppPage() {
 
         if (state.status === 'connecting' || state.status === 'connected') {
             setPolling(true)
-            interval = setInterval(checkStatus, 1500) // Récupération plus rapide (1.5s au lieu de 3s)
+            interval = setInterval(checkStatus, 1500)
         } else {
             setPolling(false)
         }
@@ -77,9 +78,15 @@ export default function WhatsAppPage() {
     }
 
     const startConnection = async () => {
-        if (method === 'code' && !phoneToPair) {
-            toast.error('Numéro requis', { description: 'Entrez votre numéro avec l\'indicatif (ex: 2376...).' })
-            return
+        if (method === 'code') {
+            if (!phoneToPair) {
+                toast.error('Numéro requis', { description: 'Entrez votre numéro complet (ex: 237682...).' })
+                return
+            }
+            if (phoneToPair.length < 10) {
+                toast.error('Numéro invalide', { description: 'Le numéro semble trop court. N\'oubliez pas l\'indicatif pays.' })
+                return
+            }
         }
 
         setLoading(true)
@@ -87,7 +94,9 @@ export default function WhatsAppPage() {
             const res = await fetch('/api/whatsapp/connect', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phoneNumber: method === 'code' ? phoneToPair : undefined })
+                body: JSON.stringify({
+                    phoneNumber: method === 'code' ? phoneToPair.replace(/\D/g, '') : undefined
+                })
             })
             const data = await res.json()
 
@@ -102,22 +111,24 @@ export default function WhatsAppPage() {
         } catch (error) {
             toast.error('Erreur de communication service')
             setLoading(false)
-        } finally {
-            // On laisse le loading à true tant qu'on n'a pas reçu de QR ou de PairingCode via le polling/state
         }
     }
 
-    const disconnect = async () => {
-        if (!confirm('Voulez-vous vraiment déconnecter WhatsApp ?')) return
+    const disconnect = async (isCancel = false) => {
+        if (!isCancel && !confirm('Voulez-vous vraiment déconnecter WhatsApp ?')) return
 
         setLoading(true)
         try {
             await fetch('/api/whatsapp/connect', { method: 'DELETE' })
             setState({ status: 'disconnected' })
-            toast.success('Déconnecté')
+            setLoading(false)
+            if (isCancel) {
+                toast.info('Connexion annulée')
+            } else {
+                toast.success('Appareil déconnecté')
+            }
         } catch (error) {
-            toast.error('Erreur déconnexion')
-        } finally {
+            toast.error('Erreur lors de l\'opération')
             setLoading(false)
         }
     }
@@ -295,19 +306,24 @@ export default function WhatsAppPage() {
                                                             <div className="w-20 h-20 bg-indigo-600/10 rounded-[2rem] flex items-center justify-center mx-auto mb-6 border border-indigo-600/20">
                                                                 <Smartphone className="w-10 h-10 text-indigo-400" />
                                                             </div>
-                                                            <h4 className="text-white font-bold text-xl">Numéro de téléphone</h4>
-                                                            <p className="text-slate-500 text-sm mt-2 px-6">Entrez votre numéro pour recevoir votre code secret de jumelage.</p>
+                                                            <h4 className="text-white font-bold text-lg">Numéro de téléphone</h4>
+                                                            <p className="text-slate-500 text-sm mt-2 px-6 italic">Exemple : 237682449735</p>
                                                         </div>
-                                                        <div className="relative">
-                                                            <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none text-indigo-400 font-bold text-xl">
-                                                                +
+                                                        <div className="space-y-4">
+                                                            <div className="relative">
+                                                                <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none text-indigo-400 font-bold text-xl">
+                                                                    +
+                                                                </div>
+                                                                <Input
+                                                                    placeholder="Indicatif + Numéro"
+                                                                    value={phoneToPair}
+                                                                    onChange={(e) => setPhoneToPair(e.target.value.replace(/[^\d+]/g, ''))}
+                                                                    className="h-16 pl-12 bg-white/5 border-white/10 rounded-2xl text-xl font-mono focus:border-indigo-500 focus:ring-indigo-500/20 text-white placeholder:text-slate-700 transition-all"
+                                                                />
                                                             </div>
-                                                            <Input
-                                                                placeholder="237..."
-                                                                value={phoneToPair}
-                                                                onChange={(e) => setPhoneToPair(e.target.value.replace(/[^0-9]/g, ''))}
-                                                                className="h-16 pl-12 bg-white/5 border-white/10 rounded-2xl text-xl font-mono focus:border-indigo-500 focus:ring-indigo-500/20 text-white placeholder:text-slate-700 transition-all"
-                                                            />
+                                                            <p className="text-[10px] text-center text-slate-500 uppercase tracking-widest font-bold">
+                                                                Ne pas mettre de parenthèses ou d'espaces
+                                                            </p>
                                                         </div>
                                                     </div>
                                                 ) : (
@@ -341,23 +357,33 @@ export default function WhatsAppPage() {
                             </Button>
                         )}
 
-                        {state.status === 'connecting' && (state.qrCode || state.pairingCode) && (
-                            <Button
-                                onClick={() => {
-                                    setLoading(false);
-                                    startConnection();
-                                }}
-                                variant="outline"
-                                className="h-14 border-white/10 bg-white/5 hover:bg-white/10 text-white rounded-[1.5rem] font-bold"
-                            >
-                                <RefreshCw className={cn("w-5 h-5 mr-3", loading && "animate-spin")} />
-                                Recommencer la procédure
-                            </Button>
+                        {state.status === 'connecting' && (state.qrCode || state.pairingCode || loading) && (
+                            <div className="flex flex-col gap-3">
+                                <Button
+                                    onClick={() => {
+                                        setLoading(false);
+                                        startConnection();
+                                    }}
+                                    variant="outline"
+                                    className="h-14 border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-400 rounded-[1.5rem] font-bold"
+                                >
+                                    <RefreshCw className={cn("w-5 h-5 mr-3", loading && "animate-spin")} />
+                                    Régénérer
+                                </Button>
+                                <Button
+                                    onClick={() => disconnect(true)}
+                                    variant="ghost"
+                                    className="h-14 text-slate-500 hover:text-red-400 hover:bg-red-500/5 rounded-[1.5rem] font-bold transition-colors"
+                                >
+                                    <XCircle className="w-5 h-5 mr-3" />
+                                    Annuler la procédure
+                                </Button>
+                            </div>
                         )}
 
                         {state.status === 'connected' && (
                             <Button
-                                onClick={disconnect}
+                                onClick={() => disconnect(false)}
                                 variant="outline"
                                 className="h-14 border-red-500/30 text-red-500 hover:bg-red-500/10 rounded-[1.5rem] font-bold"
                             >
@@ -378,18 +404,17 @@ export default function WhatsAppPage() {
                     </h3>
                     <p className="text-sm text-slate-500 leading-relaxed">
                         Si vous naviguez sur votre téléphone, le <span className="text-indigo-400 font-bold italic underline">Code Appareil</span> est la méthode la plus simple.
-                        Vous n'avez pas besoin d'un second écran, juste de copier les chiffres affichés ci-dessus dans votre application WhatsApp.
+                        Copiez simplement le code et saisissez-le dans WhatsApp.
                     </p>
                 </Card>
 
                 <Card className="p-8 border-white/5 bg-[#0D0D12]/30 rounded-[2rem] backdrop-blur-xl">
                     <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-3">
                         <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                        Confidentialité
+                        Aide Numéro
                     </h3>
                     <p className="text-sm text-slate-500 leading-relaxed">
-                        L'IA VibeVendor n'accède à vos conversations que pour automatiser vos ventes.
-                        Nous ne stockons aucun historique personnel et vous gardez le contrôle total depuis WhatsApp.
+                        Le numéro doit être entré avec son indicatif international. Pour le Cameroun par exemple, commencez par <span className="text-white font-bold">237</span> suivi de votre numéro à 9 chiffres.
                     </p>
                 </Card>
             </div>
