@@ -45,6 +45,7 @@ const connectionStatus = new Map()
 const pairingCodes = new Map()
 const preferredMethod = new Map() // 'qr' ou 'code'
 const pendingPairing = new Map()
+const pairingCodeRequested = new Map()
 
 const authMiddleware = (req, res, next) => {
     if (req.headers['x-api-secret'] !== API_SECRET) {
@@ -68,6 +69,7 @@ async function startSession(userId, phoneNumber = null) {
     // Reset immédiat des états d'affichage
     qrCodes.delete(userId)
     pairingCodes.delete(userId)
+    pairingCodeRequested.delete(userId)
 
     if (isCodeMode) {
         pendingPairing.set(userId, phoneNumber.replace(/\D/g, ''))
@@ -121,8 +123,8 @@ async function startSession(userId, phoneNumber = null) {
         const socketConfig = {
             version,
             auth: state,
-            // Signature importante pour la compatibilité Pairing Code
-            browser: ['Mac OS', 'Safari', '110.0.5481.100'],
+            // Signature recommandée pour le Pairing Code
+            browser: ['Ubuntu', 'Chrome', '110.0.5481.100'],
             logger: pino({ level: 'silent' }),
             printQRInTerminal: false,
             connectTimeoutMs: 60000,
@@ -141,16 +143,25 @@ async function startSession(userId, phoneNumber = null) {
             if (qr) {
                 const phone = pendingPairing.get(userId)
                 if (phone) {
-                    console.log(`[Pairing] Signal QR intercepté. Demande code pour ${phone}...`)
-                    try {
-                        const code = await socket.requestPairingCode(phone)
-                        console.log(`[Pairing] SUCCÈS Code: ${code}`)
-                        pairingCodes.set(userId, code)
-                        qrCodes.delete(userId)
-                        pendingPairing.delete(userId)
-                    } catch (err) {
-                        console.error(`[Pairing] Échec:`, err.message)
-                        pairingCodes.set(userId, "ERREUR")
+                    // SOLUTION IA : Délai de 5s + Verrouillage anti-boucle
+                    if (!pairingCodeRequested.get(userId)) {
+                        pairingCodeRequested.set(userId, true)
+                        console.log(`[Pairing] Signal QR reçu. Attente de 5s pour stabilisation socket...`)
+
+                        setTimeout(async () => {
+                            try {
+                                console.log(`[Pairing] Envoi demande pour ${phone}...`)
+                                const code = await socket.requestPairingCode(phone)
+                                console.log(`[Pairing] SUCCÈS Code: ${code}`)
+                                pairingCodes.set(userId, code)
+                                qrCodes.delete(userId)
+                                pendingPairing.delete(userId)
+                            } catch (err) {
+                                console.error(`[Pairing] Échec après 5s:`, err.message)
+                                pairingCodes.set(userId, "ERREUR")
+                                pairingCodeRequested.set(userId, false) // Permettre retry
+                            }
+                        }, 5000)
                     }
                 } else {
                     console.log(`[QR] Image générée pour ${userId}`)
