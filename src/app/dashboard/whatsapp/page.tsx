@@ -38,6 +38,7 @@ interface WhatsAppState {
     pairingCode?: string
     phoneNumber?: string
     message?: string
+    sessionStartTime?: string // Date ISO du serveur
 }
 
 export default function WhatsAppPage() {
@@ -89,20 +90,6 @@ export default function WhatsAppPage() {
         }
     }, [state.status])
 
-    // Gestion du compteur de session
-    useEffect(() => {
-        if (state.status === 'connected') {
-            // Démarrer le compteur si pas déjà démarré
-            if (!sessionStartTime) {
-                setSessionStartTime(new Date())
-            }
-        } else {
-            // Réinitialiser quand déconnecté
-            setSessionStartTime(null)
-            setSessionDuration('00:00:00')
-        }
-    }, [state.status])
-
     // Mise à jour du compteur chaque seconde
     useEffect(() => {
         if (!sessionStartTime || state.status !== 'connected') return
@@ -131,6 +118,21 @@ export default function WhatsAppPage() {
 
             if (data.status === 'connected' && state.status !== 'connected') {
                 toast.success('WhatsApp connecté !')
+            }
+
+            // Sync server time logic
+            if (data.sessionStartTime) {
+                const serverTime = new Date(data.sessionStartTime)
+                // On met à jour seulement si différent pour éviter les re-renders
+                if (!sessionStartTime || Math.abs(serverTime.getTime() - sessionStartTime.getTime()) > 1000) {
+                    setSessionStartTime(serverTime)
+                }
+            } else if (data.status === 'connected' && !sessionStartTime) {
+                // Fallback si le serveur n'a pas encore la date (transition)
+                setSessionStartTime(new Date())
+            } else if (data.status !== 'connected') {
+                setSessionStartTime(null)
+                setSessionDuration('00:00:00')
             }
 
             setState(data)

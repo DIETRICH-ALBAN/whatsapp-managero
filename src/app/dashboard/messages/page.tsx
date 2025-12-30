@@ -531,7 +531,14 @@ export default function MessagesPage() {
 
                         <div className="p-4 bg-card/80 backdrop-blur-md border-t border-border mt-auto">
                             <div className="flex items-end gap-2 max-w-4xl mx-auto bg-muted/30 p-2 rounded-2xl border border-border focus-within:ring-2 focus-within:ring-indigo-500/20">
-                                <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0"><Paperclip className="w-4 h-4" /></Button>
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-9 w-9 shrink-0"
+                                    onClick={() => toast.info('Envoi de fichiers', { description: 'Cette fonctionnalité sera disponible dans la version Pro.' })}
+                                >
+                                    <Paperclip className="w-4 h-4" />
+                                </Button>
                                 <textarea
                                     className="flex-1 bg-transparent border-none focus:ring-0 text-xs py-2 min-h-[40px] max-h-32 resize-none outline-none"
                                     rows={1}
