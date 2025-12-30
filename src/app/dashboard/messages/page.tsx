@@ -74,6 +74,16 @@ export default function MessagesPage() {
     const [inputText, setInputText] = useState('')
     const [suggestions, setSuggestions] = useState<string[]>([])
     const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+    const [searchQuery, setSearchQuery] = useState('')
+
+    const filteredConversations = conversations.filter(c => {
+        const query = searchQuery.toLowerCase()
+        return (
+            c.contact_name?.toLowerCase().includes(query) ||
+            c.contact_phone?.includes(query) ||
+            c.last_message?.toLowerCase().includes(query)
+        )
+    })
 
     // Pour le mobile : afficher la liste ou le chat
     const [showChatOnMobile, setShowChatOnMobile] = useState(false)
@@ -309,12 +319,17 @@ export default function MessagesPage() {
                     </div>
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input placeholder="Rechercher..." className="pl-9 bg-muted/50 border-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-xl" />
+                        <Input
+                            placeholder="Rechercher..."
+                            className="pl-9 bg-muted/50 border-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-xl"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
                     </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
-                    {conversations.map(convo => {
+                    {filteredConversations.map(convo => {
                         const intent = getIntentInfo(convo.intent_tag)
                         return (
                             <div
