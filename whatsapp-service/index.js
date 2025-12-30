@@ -318,7 +318,8 @@ async function startSession(userId, phoneNumber = null) {
                             .select('*').eq('user_id', userId).eq('contact_phone', senderNumber).single()
 
                         if (!conversation) {
-                            const { data: newC } = await supabase.from('conversations').insert({
+                            console.log(`[MSG] Nouvelle conversation: ${senderNumber} -> ${finalContactName}`)
+                            const { data: newC, error: convError } = await supabase.from('conversations').insert({
                                 user_id: userId,
                                 contact_phone: senderNumber,
                                 contact_name: finalContactName,
@@ -326,6 +327,9 @@ async function startSession(userId, phoneNumber = null) {
                                 last_message_at: new Date().toISOString(),
                                 unread_count: 1
                             }).select().single()
+                            if (convError) {
+                                console.error('[MSG] Erreur création conversation:', convError)
+                            }
                             conversation = newC
                         } else {
                             // Mise à jour : on met à jour le nom aussi si on l'a (pour corriger les anciens numéros)
@@ -342,15 +346,26 @@ async function startSession(userId, phoneNumber = null) {
                             await supabase.from('conversations').update(updateData).eq('id', conversation.id)
                         }
 
-                        await supabase.from('messages').insert({
+                        console.log(`[MSG] Insertion message: ${messageContent.substring(0, 30)}...`)
+
+                        // Insertion sans les colonnes optionnelles pour compatibilité
+                        const msgPayload = {
                             conversation_id: conversation.id,
                             contact_phone: senderNumber,
                             content: messageContent,
                             direction: 'inbound',
-                            status: 'received',
-                            message_type: messageType,
-                            media_url: mediaUrl
-                        })
+                            status: 'received'
+                        }
+                        // Ajouter les colonnes optionnelles seulement si elles ont une valeur
+                        if (messageType && messageType !== 'text') msgPayload.message_type = messageType
+                        if (mediaUrl) msgPayload.media_url = mediaUrl
+
+                        const { error: msgError } = await supabase.from('messages').insert(msgPayload)
+                        if (msgError) {
+                            console.error('[MSG] Erreur insertion message:', msgError)
+                        } else {
+                            console.log('[MSG] Message inséré avec succès!')
+                        }
 
                         if (conversation.is_ai_enabled && conversation.agent_id) {
                             try {
@@ -368,9 +383,13 @@ async function startSession(userId, phoneNumber = null) {
                                         content: aiData.response, direction: 'outbound', status: 'sent', is_ai_generated: true
                                     })
                                 }
-                            } catch (e) { }
+                            } catch (aiErr) {
+                                console.error('[AI] Erreur réponse IA:', aiErr)
+                            }
                         }
-                    } catch (e) { }
+                    } catch (dbErr) {
+                        console.error('[DB] Erreur base de données:', dbErr)
+                    }
                 } catch (msgErr) {
                     console.error('[Error processing message]', msgErr)
                 }
