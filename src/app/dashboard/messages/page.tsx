@@ -145,8 +145,7 @@ export default function MessagesPage() {
             const { data, error } = await supabase
                 .from('conversations')
                 .select('*')
-                .order('priority_score', { ascending: false })
-                .order('updated_at', { ascending: false })
+                .order('last_message_at', { ascending: false, nullsFirst: false })
 
             if (error) throw error
             if (data) setConversations(data)
