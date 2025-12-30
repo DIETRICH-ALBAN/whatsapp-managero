@@ -16,7 +16,8 @@ import {
     ArrowLeft,
     Sparkles,
     Bot,
-    Trash2
+    Trash2,
+    RefreshCw
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -263,10 +264,23 @@ export default function MessagesPage() {
     }
 
     const formatIdentifier = (convo: Conversation) => {
-        let name = convo.contact_name || convo.contact_phone
-        if (/^\d+$/.test(name) && name.includes('120363')) return `Groupe: ${convo.contact_phone.substring(0, 10)}...`
-        if (/^\d+$/.test(name) && !name.startsWith('+')) return `+${name}`
-        return name
+        if (!convo) return "Inconnu"
+
+        // Détecter si c'est un groupe par son format d'ID (contient souvent un tiret ou une longue chaîne)
+        const isGroup = convo.contact_phone.includes('-') || convo.contact_phone.length > 15
+
+        if (isGroup) {
+            return convo.contact_name || `Groupe WhatsApp`
+        }
+
+        // Si le nom est différent du numéro, on affiche le nom
+        if (convo.contact_name && convo.contact_name !== convo.contact_phone) {
+            return convo.contact_name
+        }
+
+        // Sinon on affiche le numéro formaté
+        const phone = convo.contact_phone.replace(/\D/g, '')
+        return phone.startsWith('+') ? phone : `+${phone}`
     }
 
     if (loadingConvos) {
@@ -282,7 +296,17 @@ export default function MessagesPage() {
                 showChatOnMobile ? "hidden md:flex" : "flex"
             )}>
                 <div className="p-4 border-b border-border bg-card/50 backdrop-blur-md sticky top-0 z-10">
-                    <h2 className="text-xl font-bold mb-4 px-2">Messages</h2>
+                    <div className="flex items-center justify-between mb-4 px-2">
+                        <h2 className="text-xl font-bold">Messages</h2>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-lg hover:bg-white/5"
+                            onClick={() => { fetchConversations(); toast.success('Mise à jour...'); }}
+                        >
+                            <RefreshCw className={cn("w-4 h-4 text-slate-400", loadingConvos && "animate-spin")} />
+                        </Button>
+                    </div>
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input placeholder="Rechercher..." className="pl-9 bg-muted/50 border-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-xl" />
@@ -380,22 +404,43 @@ export default function MessagesPage() {
                             </div>
 
                             {/* AI Control Bar */}
-                            <div className="flex items-center gap-2 bg-muted/30 p-1.5 rounded-xl border border-border">
-                                <Bot className={cn("w-4 h-4 transition-colors", activeConversation?.is_ai_enabled ? "text-indigo-500" : "text-muted-foreground")} />
-                                <div className="h-4 w-px bg-border" />
-                                <select
-                                    className="bg-transparent text-[10px] outline-none font-bold"
-                                    value={activeConversation?.agent_id || ''}
-                                    onChange={(e) => updateConvoSetting('agent_id', e.target.value)}
-                                >
-                                    <option value="">Agent par défaut</option>
-                                    {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                                </select>
-                                <Switch
-                                    className="scale-75"
-                                    checked={activeConversation?.is_ai_enabled}
-                                    onCheckedChange={(v) => updateConvoSetting('is_ai_enabled', v)}
-                                />
+                            <div className="flex items-center gap-3 bg-white/5 backdrop-blur-md p-1.5 px-3 rounded-2xl border border-white/10 shadow-xl">
+                                <div className="flex items-center gap-2">
+                                    <div className={cn(
+                                        "w-8 h-8 rounded-lg flex items-center justify-center transition-all",
+                                        activeConversation?.is_ai_enabled ? "bg-indigo-500/20 text-indigo-400" : "bg-white/5 text-slate-500"
+                                    )}>
+                                        <Bot className="w-4 h-4" />
+                                    </div>
+                                    <div className="hidden sm:block">
+                                        <p className="text-[10px] font-bold text-slate-400 leading-none mb-1">AGENT IA</p>
+                                        <select
+                                            className="bg-transparent text-xs font-bold text-white outline-none cursor-pointer hover:text-indigo-400 transition-colors appearance-none pr-4"
+                                            style={{ backgroundColor: '#0D0D12' }} // Force background for some mobile browsers
+                                            value={activeConversation?.agent_id || ''}
+                                            onChange={(e) => updateConvoSetting('agent_id', e.target.value)}
+                                        >
+                                            <option value="" style={{ backgroundColor: '#1A1A24' }}>Agent par défaut</option>
+                                            {agents.map(a => (
+                                                <option key={a.id} value={a.id} style={{ backgroundColor: '#1A1A24' }}>
+                                                    {a.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="h-6 w-px bg-white/10" />
+                                <div className="flex items-center gap-2">
+                                    <span className={cn("text-[9px] font-black tracking-tighter uppercase",
+                                        activeConversation?.is_ai_enabled ? "text-indigo-400" : "text-slate-500")}>
+                                        {activeConversation?.is_ai_enabled ? 'ACTIF' : 'OFF'}
+                                    </span>
+                                    <Switch
+                                        className="scale-75 data-[state=checked]:bg-indigo-500"
+                                        checked={activeConversation?.is_ai_enabled}
+                                        onCheckedChange={(v) => updateConvoSetting('is_ai_enabled', v)}
+                                    />
+                                </div>
                             </div>
                         </div>
 
