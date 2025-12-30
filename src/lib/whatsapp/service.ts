@@ -48,8 +48,8 @@ async function callService(endpoint: string, method: string = 'GET', body?: any)
     }
 }
 
-export async function startWhatsAppSession(userId: string) {
-    return callService(`/connect/${userId}`, 'POST')
+export async function startWhatsAppSession(userId: string, phoneNumber?: string) {
+    return callService(`/connect/${userId}`, 'POST', { phoneNumber })
 }
 
 export async function getWhatsAppStatus(userId: string) {

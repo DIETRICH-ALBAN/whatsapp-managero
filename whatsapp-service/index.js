@@ -42,6 +42,7 @@ app.use((req, res, next) => {
 const activeSockets = new Map()
 const qrCodes = new Map()
 const connectionStatus = new Map()
+const pairingCodes = new Map() // Nouveau
 
 const authMiddleware = (req, res, next) => {
     if (req.headers['x-api-secret'] !== API_SECRET) {
@@ -58,7 +59,7 @@ setInterval(() => {
     console.log(`[Health] Service actif - ${new Date().toISOString()} - Sockets: ${activeSockets.size}`)
 }, 600000) // Toutes les 10 minutes
 
-async function startSession(userId) {
+async function startSession(userId, phoneNumber = null) {
     if (activeSockets.has(userId)) {
         console.log(`[Session] Déjà active pour ${userId}`)
         return {
@@ -127,12 +128,14 @@ async function startSession(userId) {
                 console.log(`[QR] Nouveau code pour ${userId}`)
                 const qrData = await QRCode.toDataURL(qr)
                 qrCodes.set(userId, qrData)
+                pairingCodes.delete(userId) // Un QR annule le code précédent
             }
 
             if (connection === 'open') {
                 console.log(`[Connexion] Succès pour ${userId}`)
                 connectionStatus.set(userId, 'connected')
                 qrCodes.delete(userId)
+                pairingCodes.delete(userId)
                 await supabase.from('whatsapp_sessions').upsert({
                     user_id: userId,
                     phone_number: socket.user?.id.split(':')[0],
@@ -148,6 +151,8 @@ async function startSession(userId) {
                     ? lastDisconnect.error.output?.statusCode !== DisconnectReason.loggedOut
                     : true
                 if (shouldReconnect) setTimeout(() => startSession(userId), 5000)
+                pairingCodes.delete(userId)
+                qrCodes.delete(userId)
             }
         })
 
@@ -346,66 +351,83 @@ async function startSession(userId) {
                     console.error(`[Message] Erreur DB:`, dbError.message)
                 }
             }
+            // Nouveau: Si un numéro est fourni, générer un code de couplage (Pairing Code)
+            if (phoneNumber) {
+                setTimeout(async () => {
+                    try {
+                        console.log(`[Pairing] Génération code pour ${phoneNumber}...`)
+                        const code = await socket.requestPairingCode(phoneNumber)
+                        console.log(`[Pairing] Code généré: ${code}`)
+                        pairingCodes.set(userId, code)
+                        qrCodes.delete(userId) // On cache le QR si on utilise le code
+                    } catch (err) {
+                        console.error(`[Pairing] Erreur:`, err.message)
+                    }
+                }, 5000) // On attend un peu que le socket soit prêt
+            }
+
+            return { status: 'connecting' }
+        } catch (e) {
+            console.error(`[CRASH] ${userId}:`, e.message)
+            return { status: 'error', message: e.message }
+        }
+    }
+
+app.post('/connect/:userId', authMiddleware, async (req, res) => {
+        const { phoneNumber } = req.body
+        res.json(await startSession(req.params.userId, phoneNumber))
+    })
+    app.get('/status/:userId', authMiddleware, (req, res) => {
+        res.json({
+            status: connectionStatus.get(req.params.userId) || 'disconnected',
+            qrCode: qrCodes.get(req.params.userId),
+            pairingCode: pairingCodes.get(req.params.userId), // Nouveau
+            phoneNumber: activeSockets.get(req.params.userId)?.user?.id.split(':')[0]
         })
-
-        return { status: 'connecting' }
-    } catch (e) {
-        console.error(`[CRASH] ${userId}:`, e.message)
-        return { status: 'error', message: e.message }
-    }
-}
-
-app.post('/connect/:userId', authMiddleware, async (req, res) => res.json(await startSession(req.params.userId)))
-app.get('/status/:userId', authMiddleware, (req, res) => {
-    res.json({
-        status: connectionStatus.get(req.params.userId) || 'disconnected',
-        qrCode: qrCodes.get(req.params.userId),
-        phoneNumber: activeSockets.get(req.params.userId)?.user?.id.split(':')[0]
     })
-})
 
-app.get('/debug/:userId', authMiddleware, (req, res) => {
-    const userId = req.params.userId
-    res.json({
-        hasSocket: activeSockets.has(userId),
-        status: connectionStatus.get(userId),
-        hasQr: !!qrCodes.get(userId),
-        qrLength: qrCodes.get(userId)?.length || 0,
-        sessionExists: fs.existsSync(path.join(__dirname, 'sessions', userId))
+    app.get('/debug/:userId', authMiddleware, (req, res) => {
+        const userId = req.params.userId
+        res.json({
+            hasSocket: activeSockets.has(userId),
+            status: connectionStatus.get(userId),
+            hasQr: !!qrCodes.get(userId),
+            qrLength: qrCodes.get(userId)?.length || 0,
+            sessionExists: fs.existsSync(path.join(__dirname, 'sessions', userId))
+        })
     })
-})
-app.delete('/disconnect/:userId', authMiddleware, async (req, res) => {
-    const socket = activeSockets.get(req.params.userId)
-    if (socket) {
-        try { await socket.logout() } catch (e) { }
-        activeSockets.delete(req.params.userId)
-        connectionStatus.set(req.params.userId, 'disconnected')
-    }
-    res.json({ success: true })
-})
+    app.delete('/disconnect/:userId', authMiddleware, async (req, res) => {
+        const socket = activeSockets.get(req.params.userId)
+        if (socket) {
+            try { await socket.logout() } catch (e) { }
+            activeSockets.delete(req.params.userId)
+            connectionStatus.set(req.params.userId, 'disconnected')
+        }
+        res.json({ success: true })
+    })
 
-// === ENVOI DE MESSAGES ===
-app.post('/send/:userId', authMiddleware, async (req, res) => {
-    const { userId } = req.params
-    const { phoneNumber, message } = req.body
+    // === ENVOI DE MESSAGES ===
+    app.post('/send/:userId', authMiddleware, async (req, res) => {
+        const { userId } = req.params
+        const { phoneNumber, message } = req.body
 
-    const socket = activeSockets.get(userId)
-    if (!socket) {
-        return res.status(400).json({ error: 'WhatsApp non connecté' })
-    }
+        const socket = activeSockets.get(userId)
+        if (!socket) {
+            return res.status(400).json({ error: 'WhatsApp non connecté' })
+        }
 
-    try {
-        // Formater le numéro au format WhatsApp (ajouter @s.whatsapp.net)
-        const jid = phoneNumber.includes('@') ? phoneNumber : `${phoneNumber}@s.whatsapp.net`
+        try {
+            // Formater le numéro au format WhatsApp (ajouter @s.whatsapp.net)
+            const jid = phoneNumber.includes('@') ? phoneNumber : `${phoneNumber}@s.whatsapp.net`
 
-        await socket.sendMessage(jid, { text: message })
-        console.log(`[Envoi] Message envoyé à ${phoneNumber}`)
+            await socket.sendMessage(jid, { text: message })
+            console.log(`[Envoi] Message envoyé à ${phoneNumber}`)
 
-        res.json({ success: true, message: 'Message envoyé' })
-    } catch (error) {
-        console.error(`[Envoi] Erreur:`, error.message)
-        res.status(500).json({ error: 'Échec envoi', details: error.message })
-    }
-})
+            res.json({ success: true, message: 'Message envoyé' })
+        } catch (error) {
+            console.error(`[Envoi] Erreur:`, error.message)
+            res.status(500).json({ error: 'Échec envoi', details: error.message })
+        }
+    })
 
-app.listen(PORT, HOST, () => console.log(`🚀 Microservice prêt sur ${PORT}`))
+    app.listen(PORT, HOST, () => console.log(`🚀 Microservice prêt sur ${PORT}`))

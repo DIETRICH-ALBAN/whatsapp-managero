@@ -17,8 +17,17 @@ export async function POST(request: NextRequest) {
         }
 
         console.log(`[Vercel API] Tentative de connexion WhatsApp pour: ${user.id}`)
-        const result = await startWhatsAppSession(user.id)
 
+        // Lire le numéro de téléphone si présent
+        let phoneNumber = undefined
+        try {
+            const body = await request.json()
+            phoneNumber = body.phoneNumber
+        } catch (e) {
+            // Pas de body ou mal formatté, on continue sans numéro
+        }
+
+        const result = await startWhatsAppSession(user.id, phoneNumber)
         return NextResponse.json(result)
 
     } catch (error: any) {
