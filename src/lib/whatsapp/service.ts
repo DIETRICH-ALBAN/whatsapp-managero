@@ -4,15 +4,15 @@
  */
 
 function getServiceUrl() {
-    let url = process.env.WHATSAPP_SERVICE_URL || 'https://vibevendor.up.railway.app'
+    let url = process.env.WHATSAPP_SERVICE_URL || process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL || 'https://vibevendor.up.railway.app'
 
-    // S'assurer que l'URL commence par https://
     if (!url.startsWith('http')) {
         url = `https://${url}`
     }
 
-    // Enlever le slash final s'il existe
-    return url.replace(/\/$/, '')
+    const finalUrl = url.replace(/\/$/, '')
+    console.log('[WhatsApp] URL de service configurée:', finalUrl)
+    return finalUrl
 }
 
 const SERVICE_SECRET = process.env.WHATSAPP_SERVICE_SECRET || 'vibe_vendor_secure_2024'
