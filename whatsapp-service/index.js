@@ -177,7 +177,15 @@ async function startSession(userId, phoneNumber = null) {
 
             if (connection === 'close') {
                 const errorCode = (lastDisconnect?.error instanceof Boom) ? lastDisconnect.error.output?.statusCode : 0
-                const shouldReconnect = errorCode !== DisconnectReason.loggedOut && errorCode !== 0
+
+                // Purgement auto si session expirée ou déconnectée
+                if (errorCode === DisconnectReason.loggedOut || errorCode === 401) {
+                    supabase.from('whatsapp_sessions').delete().eq('user_id', userId).then(() => {
+                        console.log(`[Auth] Session corrompue purgée.`)
+                    })
+                }
+
+                const shouldReconnect = errorCode !== DisconnectReason.loggedOut && errorCode !== 401 && errorCode !== 0
 
                 console.log(`[Connexion] Fermée (${errorCode}). Reconnect auto: ${shouldReconnect}`)
 
