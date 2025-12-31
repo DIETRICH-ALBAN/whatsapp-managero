@@ -46,7 +46,7 @@ export const useSupabaseAuthState = async (supabase, userId) => {
                     session_data: json,
                     updated_at: new Date().toISOString(),
                     is_connected: true
-                })
+                }, { onConflict: 'user_id' })
                 if (error) console.error('[Auth] Erreur DB:', error.message)
                 else console.log(`[Auth] Backup session réussi (${Math.round(json.length / 1024)} KB)`)
             } catch (err) {
