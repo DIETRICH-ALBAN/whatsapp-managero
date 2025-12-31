@@ -181,11 +181,17 @@ async function startSession(userId, phoneNumber = null) {
 
             if (connection === 'close') {
                 const errorCode = (lastDisconnect?.error instanceof Boom) ? lastDisconnect.error.output?.statusCode : 0
-                const shouldReconnect = errorCode !== DisconnectReason.loggedOut
-                console.log(`[Connexion] Fermée (${errorCode}). Reconnexion: ${shouldReconnect}`)
+                // Ne recomnnecter que pour les erreurs récupérables explicites (pas 0 ou undefined, souvent signe de corruption state)
+                const shouldReconnect = errorCode !== DisconnectReason.loggedOut && errorCode !== 0
+
+                console.log(`[Connexion] Fermée (${errorCode}). Reconnexion auto: ${shouldReconnect}`)
+
                 activeSockets.delete(userId)
                 connectionStatus.set(userId, 'disconnected')
-                if (shouldReconnect) setTimeout(() => startSession(userId), 5000)
+
+                if (shouldReconnect) {
+                    setTimeout(() => startSession(userId), 5000)
+                }
             }
         })
 

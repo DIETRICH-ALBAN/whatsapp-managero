@@ -1,8 +1,8 @@
-import { initAuthCreds, BufferJSON, proto } from '@whiskeysockets/baileys'
+import { initAuthCreds, BufferJSON } from '@whiskeysockets/baileys'
 
 export const useSupabaseAuthState = async (supabase, userId) => {
     // 1. Charger les données existantes
-    const { data: sessionData, error } = await supabase
+    const { data: sessionData } = await supabase
         .from('whatsapp_sessions')
         .select('session_data')
         .eq('user_id', userId)
@@ -14,28 +14,40 @@ export const useSupabaseAuthState = async (supabase, userId) => {
     }
 
     if (sessionData?.session_data) {
-        // Restaurer l'état depuis le JSON avec BufferJSON pour gérer les Buffers
-        const restored = JSON.parse(sessionData.session_data, BufferJSON.reviver)
-        state = {
-            creds: restored.creds || initAuthCreds(),
-            keys: restored.keys || {}
+        try {
+            const restored = JSON.parse(sessionData.session_data, BufferJSON.reviver)
+            state = {
+                creds: restored.creds || initAuthCreds(),
+                keys: restored.keys || {}
+            }
+            console.log(`[Auth] Session restaurée pour ${userId}`)
+        } catch (e) {
+            console.error('[Auth] Erreur lecture session_data, reset nécessaire')
         }
     }
 
-    // 2. Fonction de sauvegarde
+    // 2. Fonction de sauvegarde avec DEBOUNCE pour éviter de saturer la DB
+    let saveTimeout = null
     const saveState = async () => {
-        try {
-            const json = JSON.stringify({ creds: state.creds, keys: state.keys }, BufferJSON.replacer, 2)
-            const { error } = await supabase.from('whatsapp_sessions').upsert({
-                user_id: userId,
-                session_data: json,
-                updated_at: new Date().toISOString(),
-                is_connected: true
-            }, { onConflict: 'user_id' })
-            if (error) console.error('[Auth] Erreur sauvegarde Supabase:', error.message)
-        } catch (err) {
-            console.error('[Auth] Crash sauvegarde:', err.message)
-        }
+        if (saveTimeout) return // Déjà une sauvegarde prévue
+
+        saveTimeout = setTimeout(async () => {
+            try {
+                const json = JSON.stringify({ creds: state.creds, keys: state.keys }, BufferJSON.replacer)
+                const { error } = await supabase.from('whatsapp_sessions').upsert({
+                    user_id: userId,
+                    session_data: json,
+                    updated_at: new Date().toISOString(),
+                    is_connected: true
+                })
+                if (error) console.error('[Auth] Erreur sauvegarde Supabase:', error.message)
+                else console.log(`[Auth] Session sauvegardée pour ${userId} (${Math.round(json.length / 1024)} KB)`)
+            } catch (err) {
+                console.error('[Auth] Crash sauvegarde:', err.message)
+            } finally {
+                saveTimeout = null
+            }
+        }, 2000) // On attend 2 secondes de calme avant de sauvegarder
     }
 
     return {
@@ -57,11 +69,8 @@ export const useSupabaseAuthState = async (supabase, userId) => {
                         for (const id in data[type]) {
                             const key = `${type}-${id}`
                             const value = data[type][id]
-                            if (value) {
-                                state.keys[key] = value
-                            } else {
-                                delete state.keys[key]
-                            }
+                            if (value) state.keys[key] = value
+                            else delete state.keys[key]
                         }
                     }
                     await saveState()
