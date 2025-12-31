@@ -1,5 +1,6 @@
 /**
- * VIBE Agent - WhatsApp Service (Stable ESM & Supabase Auth)
+ * VIBE Messaging Engine v2
+ * Architecture simplifiée pour Railway + Supabase
  */
 
 import 'dotenv/config'
@@ -8,365 +9,164 @@ import cors from 'cors'
 import makeWASocket, {
     DisconnectReason,
     fetchLatestBaileysVersion,
-    downloadMediaMessage
+    initAuthCreds,
+    BufferJSON
 } from '@whiskeysockets/baileys'
-
 import { Boom } from '@hapi/boom'
-import QRCode from 'qrcode'
 import { createClient } from '@supabase/supabase-js'
+import QRCode from 'qrcode'
 import pino from 'pino'
-import fs from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url'
-import { useSupabaseAuthState } from './supabaseAuth.js'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-const PORT = 3000
-const HOST = '0.0.0.0'
-
-const SUPABASE_URL = process.env.SUPABASE_URL
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
-const API_SECRET = process.env.API_SECRET || 'vibe_vendor_secure_2024'
 
 const app = express()
 app.use(cors())
 app.use(express.json())
 
-app.use((req, res, next) => {
-    if (req.url !== '/health') console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`)
-    next()
-})
+const SUPABASE_URL = process.env.SUPABASE_URL
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
+const API_SECRET = process.env.API_SECRET || 'vibe_secret'
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
+// Mémoire vive pour les sockets actifs
 const activeSockets = new Map()
-const qrCodes = new Map()
-const connectionStatus = new Map()
-const pairingCodes = new Map()
-const preferredMethod = new Map() // 'qr' ou 'code'
-const pendingPairing = new Map()
-const pairingCodeRequested = new Map() // Lock anti-boucle
-const sessionStartTimes = new Map()
+const sessionStates = new Map() // { status, qr, pairingCode }
 
-const authMiddleware = (req, res, next) => {
-    if (req.headers['x-api-secret'] !== API_SECRET) {
-        return res.status(401).json({ error: 'Non autorisé' })
-    }
-    next()
-}
+/**
+ * ADAPTATEUR DE SESSION ATOMIQUE
+ * Sauvegarde tout le bloc d'un coup pour éviter de saturer Supabase
+ */
+const getAtomicAuth = async (userId) => {
+    const { data } = await supabase.from('whatsapp_sessions').select('session_data').eq('user_id', userId).single()
 
-app.get('/', (req, res) => res.json({ status: 'online', service: 'VIBE WhatsApp' }))
-app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString(), memory: process.memoryUsage() }))
-
-setInterval(() => {
-    console.log(`[Health] Service actif - Sockets: ${activeSockets.size}`)
-}, 600000)
-
-async function restoreSessions() {
-    console.log('[Restore] Vérification des sessions à restaurer...')
-    try {
-        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-        const { data: sessions } = await supabase.from('whatsapp_sessions').select('user_id').eq('is_connected', true)
-
-        if (sessions && sessions.length > 0) {
-            console.log(`[Restore] ${sessions.length} sessions à redémarrer.`)
-            for (const s of sessions) {
-                if (!activeSockets.has(s.user_id)) {
-                    startSession(s.user_id).catch(err => console.error(`[Restore] Erreur ${s.user_id}`, err.message))
-                }
-            }
-        }
-    } catch (error) {
-        console.error('[Restore] Erreur fatale:', error.message)
-    }
-}
-setTimeout(restoreSessions, 5000)
-
-async function startSession(userId, phoneNumber = null) {
-    const isCodeMode = !!phoneNumber
-    preferredMethod.set(userId, isCodeMode ? 'code' : 'qr')
-    qrCodes.delete(userId)
-    pairingCodes.delete(userId)
-    pairingCodeRequested.delete(userId)
-
-    if (isCodeMode) pendingPairing.set(userId, phoneNumber.replace(/\D/g, ''))
-    else pendingPairing.delete(userId)
-
-    if (activeSockets.has(userId) && connectionStatus.get(userId) !== 'connected') {
-        try {
-            activeSockets.get(userId).end(undefined)
-            activeSockets.delete(userId)
-        } catch (e) { }
+    let state = { creds: initAuthCreds(), keys: {} }
+    if (data?.session_data) {
+        state = JSON.parse(data.session_data, BufferJSON.reviver)
     }
 
-    if (activeSockets.has(userId)) {
-        return {
-            status: connectionStatus.get(userId) || 'connecting',
-            qrCode: qrCodes.get(userId),
-            pairingCode: pairingCodes.get(userId)
-        }
+    const save = async () => {
+        const payload = JSON.stringify(state, BufferJSON.replacer)
+        await supabase.from('whatsapp_sessions').upsert({
+            user_id: userId,
+            session_data: payload,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' })
     }
 
-    try {
-        console.log(`[Session] Démarrage logic ${userId} (${isCodeMode ? 'CODE' : 'QR'})`)
-        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-
-        const { state, saveCreds } = await useSupabaseAuthState(supabase, userId)
-        const { version } = await fetchLatestBaileysVersion()
-
-        const socketConfig = {
-            version,
-            auth: state,
-            browser: ['Ubuntu', 'Chrome', '110.0.5481.100'],
-            logger: pino({ level: 'info' }),
-            printQRInTerminal: false,
-            connectTimeoutMs: 120000,
-            defaultQueryTimeoutMs: 120000,
-            keepAliveIntervalMs: 30000,
-            markOnlineOnConnect: true,
-            generateHighQualityLinkPreview: false
-        }
-
-        const socket = makeWASocket.default ? makeWASocket.default(socketConfig) : makeWASocket(socketConfig)
-
-        activeSockets.set(userId, socket)
-        connectionStatus.set(userId, 'connecting')
-
-        socket.ev.on('creds.update', saveCreds)
-
-        socket.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update
-
-            if (qr) {
-                const phone = pendingPairing.get(userId)
-                if (phone) {
-                    if (!pairingCodeRequested.get(userId)) {
-                        pairingCodeRequested.set(userId, true)
-                        console.log(`[Pairing] Demande de code pour ${phone}...`)
-                        setTimeout(async () => {
-                            try {
-                                const code = await socket.requestPairingCode(phone)
-                                pairingCodes.set(userId, code)
-                                qrCodes.delete(userId)
-                            } catch (err) {
-                                console.error(`[Pairing] Erreur:`, err.message)
-                                pairingCodeRequested.set(userId, false)
-                            }
-                        }, 5000)
+    return {
+        state: {
+            creds: state.creds,
+            keys: {
+                get: (type, ids) => {
+                    const res = {}
+                    for (const id of ids) {
+                        const key = `${type}-${id}`
+                        if (state.keys[key]) res[id] = state.keys[key]
                     }
-                } else {
-                    qrCodes.set(userId, await QRCode.toDataURL(qr))
-                    pairingCodes.delete(userId)
-                }
-            }
-
-            if (connection === 'open') {
-                console.log(`[Connexion] SUCCÈS - ${userId} est lié.`)
-                connectionStatus.set(userId, 'connected')
-                sessionStartTimes.set(userId, new Date().toISOString())
-                qrCodes.delete(userId)
-                pairingCodes.delete(userId)
-
-                await saveCreds()
-                await supabase.from('whatsapp_sessions').update({
-                    is_connected: true,
-                    last_connected_at: new Date().toISOString(),
-                    phone_number: socket.user?.id.split(':')[0]
-                }).eq('user_id', userId)
-            }
-
-            if (connection === 'close') {
-                const errorCode = (lastDisconnect?.error instanceof Boom) ? lastDisconnect.error.output?.statusCode : 0
-
-                // Purgement auto si session expirée ou déconnectée
-                if (errorCode === DisconnectReason.loggedOut || errorCode === 401) {
-                    supabase.from('whatsapp_sessions').delete().eq('user_id', userId).then(() => {
-                        console.log(`[Auth] Session corrompue purgée.`)
-                    })
-                }
-
-                const shouldReconnect = errorCode !== DisconnectReason.loggedOut && errorCode !== 401 && errorCode !== 0
-
-                console.log(`[Connexion] Fermée (${errorCode}). Reconnect auto: ${shouldReconnect}`)
-
-                activeSockets.delete(userId)
-                connectionStatus.set(userId, 'disconnected')
-
-                if (shouldReconnect) {
-                    setTimeout(() => startSession(userId), 5000)
-                }
-            }
-        })
-
-        socket.ev.on('messages.upsert', async (m) => {
-            const messages = m.messages
-            for (const msg of messages) {
-                try {
-                    if (msg.key.fromMe || msg.key.remoteJid === 'status@broadcast') continue
-
-                    const jid = msg.key.remoteJid
-                    const senderNumber = jid.split('@')[0]
-                    const contactName = msg.pushName || senderNumber
-
-                    let messageContent = null
-                    let messageType = 'text'
-                    let mediaUrl = null
-
-                    if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
-                        messageContent = msg.message?.conversation || msg.message?.extendedTextMessage?.text
-                    } else if (msg.message?.imageMessage) {
-                        messageContent = msg.message.imageMessage.caption || '📷 Image'
-                        messageType = 'image'
-                    } else if (msg.message?.videoMessage) {
-                        messageContent = msg.message.videoMessage.caption || '🎬 Vidéo'
-                        messageType = 'video'
-                    } else if (msg.message?.audioMessage) {
-                        messageContent = '🎤 Message vocal'
-                        messageType = 'audio'
-                    } else if (msg.message?.documentMessage) {
-                        messageContent = `📄 ${msg.message.documentMessage.fileName || 'Document'}`
-                        messageType = 'document'
-                    }
-
-                    if (!messageContent) continue
-
-                    // Media Handling
-                    if (['image', 'video', 'audio', 'document'].includes(messageType)) {
-                        try {
-                            const buffer = await downloadMediaMessage(msg, 'buffer', {})
-                            const ext = messageType === 'image' ? 'jpg' : messageType === 'video' ? 'mp4' : messageType === 'audio' ? 'ogg' : 'bin'
-                            const fileName = `${userId}/${Date.now()}_${senderNumber}.${ext}`
-                            const { data: uploadData, error: uploadError } = await supabase.storage.from('whatsapp-media').upload(fileName, buffer, { contentType: `${messageType}/*`, upsert: true })
-                            if (!uploadError) {
-                                const { data: publicUrl } = supabase.storage.from('whatsapp-media').getPublicUrl(fileName)
-                                mediaUrl = publicUrl.publicUrl
-                            }
-                        } catch (e) {
-                            console.error('[Media] Erreur:', e.message)
+                    return res
+                },
+                set: (data) => {
+                    for (const type in data) {
+                        for (const id in data[type]) {
+                            const key = `${type}-${id}`
+                            if (data[type][id]) state.keys[key] = data[type][id]
+                            else delete state.keys[key]
                         }
                     }
-
-                    // Group / Contact Name
-                    let finalContactName = contactName
-                    if (jid.endsWith('@g.us')) {
-                        try {
-                            const groupMetadata = await socket.groupMetadata(jid)
-                            finalContactName = groupMetadata.subject
-                        } catch (e) { }
-                    }
-
-                    const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://whatsapp-managero.vercel.app'
-                    let { data: conversation } = await supabase.from('conversations').select('*').eq('user_id', userId).eq('contact_phone', senderNumber).single()
-
-                    if (!conversation) {
-                        const { data: newC } = await supabase.from('conversations').insert({
-                            user_id: userId, contact_phone: senderNumber, contact_name: finalContactName,
-                            last_message: messageContent, last_message_at: new Date().toISOString(), unread_count: 1
-                        }).select().single()
-                        conversation = newC
-                    } else {
-                        const updateData = { last_message: messageContent, last_message_at: new Date().toISOString(), unread_count: (conversation.unread_count || 0) + 1 }
-                        if (finalContactName && finalContactName !== senderNumber) updateData.contact_name = finalContactName
-                        await supabase.from('conversations').update(updateData).eq('id', conversation.id)
-                    }
-
-                    // Insert Message
-                    const msgPayload = { conversation_id: conversation.id, contact_phone: senderNumber, content: messageContent, direction: 'inbound', status: 'received' }
-                    if (messageType !== 'text') msgPayload.message_type = messageType
-                    if (mediaUrl) msgPayload.media_url = mediaUrl
-                    await supabase.from('messages').insert(msgPayload)
-
-                    // AI Auto-Reply
-                    if (conversation.is_ai_enabled && conversation.agent_id) {
-                        try {
-                            await socket.sendPresenceUpdate('composing', jid)
-                            const aiRes = await fetch(`${SITE_URL}/api/ai/chat`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'x-api-secret': API_SECRET },
-                                body: JSON.stringify({ conversationId: conversation.id, message: messageContent, agentId: conversation.agent_id })
-                            })
-                            const aiData = await aiRes.json()
-                            if (aiData.response) {
-                                await socket.sendMessage(jid, { text: aiData.response })
-                                await supabase.from('messages').insert({
-                                    conversation_id: conversation.id, contact_phone: senderNumber,
-                                    content: aiData.response, direction: 'outbound', status: 'sent', is_ai_generated: true
-                                })
-                            }
-                        } catch (aiErr) { console.error('[AI] Erreur:', aiErr.message) }
-                    }
-                } catch (msgErr) { console.error('[Msg Processing] Erreur:', msgErr.message) }
+                    save().catch(e => console.error('Save error', e.message))
+                }
             }
-        })
-
-        return { status: 'connecting' }
-    } catch (e) {
-        console.error(`[CRASH] ${userId}:`, e.message)
-        return { status: 'error', message: e.message }
+        },
+        saveCreds: save
     }
 }
 
-app.post('/connect/:userId', authMiddleware, async (req, res) => {
-    res.json(await startSession(req.params.userId, req.body.phoneNumber))
-})
+async function startEngine(userId, phone = null) {
+    if (activeSockets.has(userId)) return
 
-app.get('/status/:userId', authMiddleware, async (req, res) => {
-    const userId = req.params.userId
-    const socket = activeSockets.get(userId)
-    let profilePic = null
-    if (socket && connectionStatus.get(userId) === 'connected') {
-        try { profilePic = await socket.profilePictureUrl(socket.user.id, 'image') } catch (e) { }
-    }
-    res.json({
-        status: connectionStatus.get(userId) || 'disconnected',
-        method: preferredMethod.get(userId) || 'qr',
-        qrCode: qrCodes.get(userId),
-        pairingCode: pairingCodes.get(userId),
-        phoneNumber: socket?.user?.id.split(':')[0],
-        sessionStartTime: sessionStartTimes.get(userId),
-        profilePic
+    console.log(`[Engine] Démarrage pour ${userId}...`)
+    sessionStates.set(userId, { status: 'initializing' })
+
+    const { state, saveCreds } = await getAtomicAuth(userId)
+    const { version } = await fetchLatestBaileysVersion()
+
+    const sock = makeWASocket.default({
+        version,
+        auth: state,
+        printQRInTerminal: false,
+        logger: pino({ level: 'silent' }),
+        browser: ['VibeVendor', 'Chrome', '110.0'],
+        connectTimeoutMs: 60000
     })
-})
 
-app.post('/send/:userId', authMiddleware, async (req, res) => {
-    const { userId } = req.params
-    const { phoneNumber, message } = req.body
-    const socket = activeSockets.get(userId)
-    if (!socket || connectionStatus.get(userId) !== 'connected') return res.status(400).json({ error: 'WhatsApp non connecté' })
-    try {
-        const jid = `${phoneNumber}@s.whatsapp.net`
-        await socket.sendMessage(jid, { text: message })
-        res.json({ success: true })
-    } catch (error) { res.status(500).json({ error: error.message }) }
-})
+    activeSockets.set(userId, sock)
 
-app.post('/send-media/:userId', authMiddleware, async (req, res) => {
-    const { userId } = req.params
-    const { phoneNumber, mediaUrl, caption, type } = req.body
-    const socket = activeSockets.get(userId)
-    if (!socket || connectionStatus.get(userId) !== 'connected') return res.status(400).json({ error: 'WhatsApp non connecté' })
-    try {
-        const jid = `${phoneNumber.includes('-') ? phoneNumber : phoneNumber + '@s.whatsapp.net'}`
-        let messageOptions = {}
-        if (type === 'image') messageOptions = { image: { url: mediaUrl }, caption }
-        else if (type === 'video') messageOptions = { video: { url: mediaUrl }, caption }
-        else if (type === 'audio') messageOptions = { audio: { url: mediaUrl }, mimetype: 'audio/mp4', ptt: true }
-        else messageOptions = { document: { url: mediaUrl }, fileName: caption || 'file', mimetype: 'application/octet-stream' }
-        await socket.sendMessage(jid, messageOptions)
-        res.json({ success: true })
-    } catch (error) { res.status(500).json({ error: error.message }) }
-})
+    sock.ev.on('creds.update', saveCreds)
 
-app.delete('/disconnect/:userId', authMiddleware, async (req, res) => {
-    const userId = req.params.userId
-    if (activeSockets.has(userId)) {
-        try { await activeSockets.get(userId).logout() } catch (e) { }
-        activeSockets.delete(userId)
-    }
-    connectionStatus.set(userId, 'disconnected')
-    qrCodes.delete(userId)
-    pairingCodes.delete(userId)
+    sock.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect, qr } = update
+
+        if (qr) {
+            if (phone) {
+                // Mode Code Appareil
+                const code = await sock.requestPairingCode(phone.replace(/\D/g, ''))
+                sessionStates.set(userId, { status: 'pairing', pairingCode: code })
+            } else {
+                // Mode QR
+                const qrData = await QRCode.toDataURL(qr)
+                sessionStates.set(userId, { status: 'qr', qr: qrData })
+            }
+        }
+
+        if (connection === 'open') {
+            console.log(`[Engine] ${userId} CONNECTÉ ✅`)
+            sessionStates.set(userId, { status: 'connected' })
+            await supabase.from('whatsapp_sessions').update({
+                is_connected: true,
+                phone_number: sock.user.id.split(':')[0]
+            }).eq('user_id', userId)
+        }
+
+        if (connection === 'close') {
+            const code = (lastDisconnect?.error instanceof Boom) ? lastDisconnect.error.output?.statusCode : 0
+            console.log(`[Engine] Connexion fermée (${code})`)
+            activeSockets.delete(userId)
+
+            if (code === DisconnectReason.loggedOut || code === 401) {
+                sessionStates.set(userId, { status: 'logged_out' })
+                await supabase.from('whatsapp_sessions').delete().eq('user_id', userId)
+            } else {
+                sessionStates.set(userId, { status: 'disconnected' })
+                setTimeout(() => startEngine(userId), 5000)
+            }
+        }
+    })
+}
+
+// RESTAURATION AU DÉMARRAGE
+const restore = async () => {
+    const { data } = await supabase.from('whatsapp_sessions').select('user_id').eq('is_connected', true)
+    data?.forEach(s => startEngine(s.user_id))
+}
+setTimeout(restore, 5000)
+
+// API ROUTES
+app.post('/connect/:userId', async (req, res) => {
+    startEngine(req.params.userId, req.body.phoneNumber)
     res.json({ success: true })
 })
 
-app.listen(PORT, HOST, () => console.log(`🚀 Microservice prêt sur ${PORT}`))
+app.get('/status/:userId', (req, res) => {
+    const state = sessionStates.get(req.params.userId) || { status: 'disconnected' }
+    res.json(state)
+})
+
+app.delete('/disconnect/:userId', async (req, res) => {
+    const sock = activeSockets.get(req.params.userId)
+    if (sock) {
+        await sock.logout()
+        activeSockets.delete(req.params.userId)
+    }
+    res.json({ success: true })
+})
+
+const PORT = process.env.PORT || 3000
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Engine v2 lancé sur ${PORT}`))
