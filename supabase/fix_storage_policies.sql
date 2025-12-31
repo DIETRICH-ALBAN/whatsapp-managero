@@ -47,3 +47,8 @@ USING (bucket_id = 'whatsapp-media');
 -- ============================================
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS message_type TEXT DEFAULT 'text';
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS media_url TEXT;
+
+-- ============================================
+-- PERSISTANCE SESSION WHATSAPP
+-- ============================================
+ALTER TABLE whatsapp_sessions ADD COLUMN IF NOT EXISTS session_data TEXT;
