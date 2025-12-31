@@ -31,7 +31,7 @@ export const useSupabaseAuthState = async (supabase, userId) => {
                 session_data: json,
                 updated_at: new Date().toISOString(),
                 is_connected: true
-            })
+            }, { onConflict: 'user_id' })
             if (error) console.error('[Auth] Erreur sauvegarde Supabase:', error.message)
         } catch (err) {
             console.error('[Auth] Crash sauvegarde:', err.message)

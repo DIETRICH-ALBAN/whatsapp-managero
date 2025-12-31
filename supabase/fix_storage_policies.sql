@@ -16,11 +16,12 @@ ON CONFLICT (id) DO UPDATE SET
     public = true,
     file_size_limit = 52428800;
 
--- 2. Supprimer les anciennes policies
+-- 2. Supprimer les anciennes policies (Nettoyage complet)
 DROP POLICY IF EXISTS "Public Upload" ON storage.objects;
 DROP POLICY IF EXISTS "Public View" ON storage.objects;
 DROP POLICY IF EXISTS "Allow authenticated uploads" ON storage.objects;
 DROP POLICY IF EXISTS "Allow public read" ON storage.objects;
+DROP POLICY IF EXISTS "Allow authenticated delete" ON storage.objects;
 
 -- 3. Créer les nouvelles policies permissives
 -- Autoriser les utilisateurs authentifiés à uploader
