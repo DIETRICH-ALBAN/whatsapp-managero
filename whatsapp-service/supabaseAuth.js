@@ -20,19 +20,26 @@ export const useSupabaseAuthState = async (supabase, userId) => {
                 creds: restored.creds || initAuthCreds(),
                 keys: restored.keys || {}
             }
-            console.log(`[Auth] Session restaurée pour ${userId}`)
+            console.log(`[Auth] Session récupérée depuis Supabase (${Math.round(sessionData.session_data.length / 1024)} KB)`)
         } catch (e) {
-            console.error('[Auth] Erreur lecture session_data, reset nécessaire')
+            console.error('[Auth] Erreur parsing session_data, reset nécessaire')
         }
     }
 
-    // 2. Fonction de sauvegarde avec DEBOUNCE pour éviter de saturer la DB
+    // 2. Sauvegarde optimisée (Debounce de 10 secondes)
     let saveTimeout = null
-    const saveState = async () => {
-        if (saveTimeout) return // Déjà une sauvegarde prévue
+    const saveState = async (force = false) => {
+        if (saveTimeout && !force) return
+
+        const delay = force ? 0 : 10000 // 10s pour laisser respirer la DB
+
+        if (saveTimeout) clearTimeout(saveTimeout)
 
         saveTimeout = setTimeout(async () => {
             try {
+                // On ne sauvegarde QUE si on a un début de credentials
+                if (!state.creds.registrationId) return
+
                 const json = JSON.stringify({ creds: state.creds, keys: state.keys }, BufferJSON.replacer)
                 const { error } = await supabase.from('whatsapp_sessions').upsert({
                     user_id: userId,
@@ -40,14 +47,14 @@ export const useSupabaseAuthState = async (supabase, userId) => {
                     updated_at: new Date().toISOString(),
                     is_connected: true
                 })
-                if (error) console.error('[Auth] Erreur sauvegarde Supabase:', error.message)
-                else console.log(`[Auth] Session sauvegardée pour ${userId} (${Math.round(json.length / 1024)} KB)`)
+                if (error) console.error('[Auth] Erreur DB:', error.message)
+                else console.log(`[Auth] Backup session réussi (${Math.round(json.length / 1024)} KB)`)
             } catch (err) {
-                console.error('[Auth] Crash sauvegarde:', err.message)
+                console.error('[Auth] Erreur fatale sauvegarde:', err.message)
             } finally {
                 saveTimeout = null
             }
-        }, 2000) // On attend 2 secondes de calme avant de sauvegarder
+        }, delay)
     }
 
     return {
@@ -58,25 +65,29 @@ export const useSupabaseAuthState = async (supabase, userId) => {
                     const data = {}
                     for (const id of ids) {
                         const key = `${type}-${id}`
-                        if (state.keys[key]) {
-                            data[id] = state.keys[key]
-                        }
+                        if (state.keys[key]) data[id] = state.keys[key]
                     }
                     return data
                 },
                 set: async (data) => {
+                    let hasChanged = false
                     for (const type in data) {
                         for (const id in data[type]) {
                             const key = `${type}-${id}`
                             const value = data[type][id]
-                            if (value) state.keys[key] = value
-                            else delete state.keys[key]
+                            if (value) {
+                                state.keys[key] = value
+                                hasChanged = true
+                            } else if (state.keys[key]) {
+                                delete state.keys[key]
+                                hasChanged = true
+                            }
                         }
                     }
-                    await saveState()
+                    if (hasChanged) await saveState()
                 }
             }
         },
-        saveCreds: saveState
+        saveCreds: () => saveState(true) // Force la sauvegarde
     }
 }

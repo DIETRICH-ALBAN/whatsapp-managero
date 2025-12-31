@@ -62,7 +62,6 @@ setInterval(() => {
     console.log(`[Health] Service actif - Sockets: ${activeSockets.size}`)
 }, 600000)
 
-// Fonction pour restaurer les sessions actives au redémarrage
 async function restoreSessions() {
     console.log('[Restore] Vérification des sessions à restaurer...')
     try {
@@ -70,17 +69,15 @@ async function restoreSessions() {
         const { data: sessions } = await supabase.from('whatsapp_sessions').select('user_id').eq('is_connected', true)
 
         if (sessions && sessions.length > 0) {
-            console.log(`[Restore] ${sessions.length} sessions trouvées. Redémarrage...`)
+            console.log(`[Restore] ${sessions.length} sessions à redémarrer.`)
             for (const s of sessions) {
                 if (!activeSockets.has(s.user_id)) {
-                    startSession(s.user_id).catch(err => console.error(`[Restore] Echec pour ${s.user_id}`, err))
+                    startSession(s.user_id).catch(err => console.error(`[Restore] Erreur ${s.user_id}`, err.message))
                 }
             }
-        } else {
-            console.log('[Restore] Aucune session active à restaurer.')
         }
     } catch (error) {
-        console.error('[Restore] Erreur:', error)
+        console.error('[Restore] Erreur fatale:', error.message)
     }
 }
 setTimeout(restoreSessions, 5000)
@@ -111,10 +108,9 @@ async function startSession(userId, phoneNumber = null) {
     }
 
     try {
-        console.log(`[Session] Initialisation ${userId} (${isCodeMode ? 'CODE' : 'QR'})`)
+        console.log(`[Session] Démarrage logic ${userId} (${isCodeMode ? 'CODE' : 'QR'})`)
         const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-        // Utilisation du AuthState DB
         const { state, saveCreds } = await useSupabaseAuthState(supabase, userId)
         const { version } = await fetchLatestBaileysVersion()
 
@@ -122,12 +118,13 @@ async function startSession(userId, phoneNumber = null) {
             version,
             auth: state,
             browser: ['Ubuntu', 'Chrome', '110.0.5481.100'],
-            logger: pino({ level: 'silent' }),
+            logger: pino({ level: 'info' }),
             printQRInTerminal: false,
-            connectTimeoutMs: 60000,
-            defaultQueryTimeoutMs: 0,
-            keepAliveIntervalMs: 10000,
-            markOnlineOnConnect: true
+            connectTimeoutMs: 120000,
+            defaultQueryTimeoutMs: 120000,
+            keepAliveIntervalMs: 30000,
+            markOnlineOnConnect: true,
+            generateHighQualityLinkPreview: false
         }
 
         const socket = makeWASocket.default ? makeWASocket.default(socketConfig) : makeWASocket(socketConfig)
@@ -145,46 +142,44 @@ async function startSession(userId, phoneNumber = null) {
                 if (phone) {
                     if (!pairingCodeRequested.get(userId)) {
                         pairingCodeRequested.set(userId, true)
-                        console.log(`[Pairing] Signal QR reçu. Attente de 5s...`)
+                        console.log(`[Pairing] Demande de code pour ${phone}...`)
                         setTimeout(async () => {
                             try {
                                 const code = await socket.requestPairingCode(phone)
                                 pairingCodes.set(userId, code)
                                 qrCodes.delete(userId)
-                                pendingPairing.delete(userId)
                             } catch (err) {
-                                pairingCodes.set(userId, "ERREUR")
+                                console.error(`[Pairing] Erreur:`, err.message)
                                 pairingCodeRequested.set(userId, false)
                             }
                         }, 5000)
                     }
                 } else {
-                    const qrData = await QRCode.toDataURL(qr)
-                    qrCodes.set(userId, qrData)
+                    qrCodes.set(userId, await QRCode.toDataURL(qr))
                     pairingCodes.delete(userId)
                 }
             }
 
             if (connection === 'open') {
-                console.log(`[Connexion] Connecté ! ${userId}`)
+                console.log(`[Connexion] SUCCÈS - ${userId} est lié.`)
                 connectionStatus.set(userId, 'connected')
                 sessionStartTimes.set(userId, new Date().toISOString())
                 qrCodes.delete(userId)
                 pairingCodes.delete(userId)
 
-                await saveCreds() // Force save
+                await saveCreds()
                 await supabase.from('whatsapp_sessions').update({
                     is_connected: true,
-                    last_connected_at: new Date().toISOString()
+                    last_connected_at: new Date().toISOString(),
+                    phone_number: socket.user?.id.split(':')[0]
                 }).eq('user_id', userId)
             }
 
             if (connection === 'close') {
                 const errorCode = (lastDisconnect?.error instanceof Boom) ? lastDisconnect.error.output?.statusCode : 0
-                // Ne recomnnecter que pour les erreurs récupérables explicites (pas 0 ou undefined, souvent signe de corruption state)
                 const shouldReconnect = errorCode !== DisconnectReason.loggedOut && errorCode !== 0
 
-                console.log(`[Connexion] Fermée (${errorCode}). Reconnexion auto: ${shouldReconnect}`)
+                console.log(`[Connexion] Fermée (${errorCode}). Reconnect auto: ${shouldReconnect}`)
 
                 activeSockets.delete(userId)
                 connectionStatus.set(userId, 'disconnected')
@@ -223,9 +218,6 @@ async function startSession(userId, phoneNumber = null) {
                     } else if (msg.message?.documentMessage) {
                         messageContent = `📄 ${msg.message.documentMessage.fileName || 'Document'}`
                         messageType = 'document'
-                    } else if (msg.message?.stickerMessage) {
-                        messageContent = '🎭 Sticker'
-                        messageType = 'sticker'
                     }
 
                     if (!messageContent) continue
@@ -242,7 +234,7 @@ async function startSession(userId, phoneNumber = null) {
                                 mediaUrl = publicUrl.publicUrl
                             }
                         } catch (e) {
-                            console.error('[Media] Error:', e.message)
+                            console.error('[Media] Erreur:', e.message)
                         }
                     }
 
@@ -293,9 +285,9 @@ async function startSession(userId, phoneNumber = null) {
                                     content: aiData.response, direction: 'outbound', status: 'sent', is_ai_generated: true
                                 })
                             }
-                        } catch (aiErr) { console.error('[AI] Erreur:', aiErr) }
+                        } catch (aiErr) { console.error('[AI] Erreur:', aiErr.message) }
                     }
-                } catch (msgErr) { console.error('[Error processing message]', msgErr) }
+                } catch (msgErr) { console.error('[Msg Processing] Erreur:', msgErr.message) }
             }
         })
 
