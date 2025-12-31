@@ -204,12 +204,25 @@ export default function MessagesPage() {
 
     const updateConvoSetting = async (key: string, value: any) => {
         if (!selectedConvoId) return
+
+        // Optimistic UI Update
+        setConversations(prev => prev.map(c =>
+            c.id === selectedConvoId ? { ...c, [key]: value } : c
+        ))
+
         try {
-            await supabase.from('conversations').update({ [key]: value }).eq('id', selectedConvoId)
-            fetchConversations()
+            const { error } = await supabase
+                .from('conversations')
+                .update({ [key]: value })
+                .eq('id', selectedConvoId)
+
+            if (error) throw error
             toast.success('Paramètre mis à jour')
         } catch (err) {
+            console.error(err)
             toast.error('Erreur mise à jour')
+            // Rollback en cas d'erreur
+            fetchConversations()
         }
     }
 
