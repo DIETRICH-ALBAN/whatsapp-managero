@@ -20,6 +20,7 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
+const API_SECRET = 'vibe_vendor_secure_2024'
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
 const activeSockets = new Map()
 const sessionStates = new Map()
