@@ -88,14 +88,16 @@ async function startEngine(userId, phone = null) {
     const { state, saveCreds } = await getAtomicAuth(userId)
     const { version } = await fetchLatestBaileysVersion()
 
-    const sock = makeWASocket.default({
+    const socketConfig = {
         version,
         auth: state,
         printQRInTerminal: false,
         logger: pino({ level: 'silent' }),
         browser: ['VibeVendor', 'Chrome', '110.0'],
         connectTimeoutMs: 60000
-    })
+    }
+
+    const sock = makeWASocket.default ? makeWASocket.default(socketConfig) : makeWASocket(socketConfig)
 
     activeSockets.set(userId, sock)
 
