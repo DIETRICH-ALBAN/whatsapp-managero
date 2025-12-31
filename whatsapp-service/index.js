@@ -127,5 +127,5 @@ app.get('/status/:userId', (req, res) => {
     res.json(sessionStates.get(req.params.userId) || { status: 'disconnected' })
 })
 
-const PORT = process.env.PORT || 3000
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 v3 Ready on ${PORT}`))
+const PORT = 3000
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Engine stable sur ${PORT}`))
