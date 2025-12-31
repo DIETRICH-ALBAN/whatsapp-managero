@@ -24,13 +24,18 @@ export const useSupabaseAuthState = async (supabase, userId) => {
 
     // 2. Fonction de sauvegarde
     const saveState = async () => {
-        const json = JSON.stringify({ creds: state.creds, keys: state.keys }, BufferJSON.replacer, 2)
-        await supabase.from('whatsapp_sessions').upsert({
-            user_id: userId,
-            session_data: json,
-            updated_at: new Date().toISOString(),
-            is_connected: true
-        })
+        try {
+            const json = JSON.stringify({ creds: state.creds, keys: state.keys }, BufferJSON.replacer, 2)
+            const { error } = await supabase.from('whatsapp_sessions').upsert({
+                user_id: userId,
+                session_data: json,
+                updated_at: new Date().toISOString(),
+                is_connected: true
+            })
+            if (error) console.error('[Auth] Erreur sauvegarde Supabase:', error.message)
+        } catch (err) {
+            console.error('[Auth] Crash sauvegarde:', err.message)
+        }
     }
 
     return {
